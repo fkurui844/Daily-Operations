@@ -1201,37 +1201,43 @@ function renderOverview(container) {
     // ── MILK INTAKE ──────────────────────────────────────────────────────────
     if (n.includes('milk') || n.includes('intake')) {
       // TOTALS column = the column literally named "TOTALS" or "Total"
-      const totalsCol  = cols.find(c => /\btotals?\b/i.test(c) && nums.includes(c));
+      const totalsCol   = cols.find(c => /\btotals?\b/i.test(c) && nums.includes(c));
       // Station cols = all numeric cols that are NOT the totals column
       const stationCols = nums.filter(c => c !== totalsCol);
 
-      // Use TOTALS column for headline figure; fallback to sum of station cols
-      const todayTotal = totalsCol
-        ? sumCol(todayRows, totalsCol)
-        : stationCols.reduce((s, c) => s + sumCol(todayRows, c), 0);
-      const prevTotal  = totalsCol
-        ? sumCol(prevRows, totalsCol)
-        : stationCols.reduce((s, c) => s + sumCol(prevRows, c), 0);
-      const chg = pct(todayTotal, prevTotal);
-      if (chg !== null && chg < -15) alerts.push({ type:'warn', msg:`Milk intake down ${Math.abs(chg).toFixed(1)}% vs previous day`, sub:`${fmtU(todayTotal,'L')} vs ${fmtU(prevTotal,'L')}` });
+      // When a filter is active, aggregate across ALL filtered rows (not just latest day)
+      const isFiltered = dateFilter.preset !== 'all';
+      const aggRows  = isFiltered ? rows : todayRows;   // full period vs single day
+      const aggPrev  = isFiltered ? []  : prevRows;     // no "prev" concept for a range
+
+      const aggTotal = totalsCol
+        ? sumCol(aggRows, totalsCol)
+        : stationCols.reduce((s, c) => s + sumCol(aggRows, c), 0);
+      const prevTotal = totalsCol
+        ? sumCol(aggPrev, totalsCol)
+        : stationCols.reduce((s, c) => s + sumCol(aggPrev, c), 0);
+
+      const chg = isFiltered ? null : pct(aggTotal, prevTotal);
+      if (chg !== null && chg < -15) alerts.push({ type:'warn', msg:`Milk intake down ${Math.abs(chg).toFixed(1)}% vs previous day`, sub:`${fmtU(aggTotal,'L')} vs ${fmtU(prevTotal,'L')}` });
 
       body.innerHTML += `
         <div class="snap-row">
-          <span class="snap-lbl">🥛 Total Milk Received</span>
-          ${trendBadge(chg)}
+          <span class="snap-lbl">Total Milk Received</span>
+          ${isFiltered ? `<span class="tb-flat" style="font-size:10px;color:var(--text-muted)">period total</span>` : trendBadge(chg)}
         </div>
         <div class="snap-row">
-          <span class="snap-val snap-ltr">${fmtU(todayTotal, 'L')}</span>
-          <span class="snap-sub">prev ${fmtU(prevTotal, 'L')}</span>
+          <span class="snap-val snap-ltr">${fmtU(aggTotal, 'L')}</span>
+          ${!isFiltered ? `<span class="snap-sub">prev ${fmtU(prevTotal, 'L')}</span>` : ''}
         </div>`;
 
-      // Show each station with today's volume (up to 5)
+      // Per-station breakdown — sum over the full period when filtered
       stationCols.slice(0, 5).forEach(col => {
-        const v    = sumCol(todayRows, col);
-        const vp   = sumCol(prevRows,  col);
-        const pctShare = todayTotal > 0 ? (v / todayTotal * 100).toFixed(0) : 0;
-        const chgS = pct(v, vp);
-        const chgCol = chgS === null ? 'var(--text-faint)' : chgS >= 0 ? '#1a7f4b' : '#a0402a';
+        const v       = sumCol(aggRows, col);
+        const vp      = sumCol(aggPrev, col);
+        const pctShare = aggTotal > 0 ? (v / aggTotal * 100).toFixed(0) : 0;
+        const chgS    = isFiltered ? null : pct(v, vp);
+        const chgCol  = chgS === null ? 'var(--text-muted)' : chgS >= 0 ? '#1a7f4b' : '#a0402a';
+        if (v === 0 && isFiltered) return; // hide zero-contribution stations when filtered
         body.innerHTML += `
           <div class="snap-row" style="margin-top:1px;">
             <span class="snap-lbl" style="font-size:10px;padding-left:8px;">↳ ${col} <span style="color:var(--text-faint)">(${pctShare}%)</span></span>
@@ -1244,79 +1250,83 @@ function renderOverview(container) {
 
     // ── PRODUCTION ───────────────────────────────────────────────────────────
     } else if (n.includes('prod')) {
-      // Find production volume + other key production metrics
       const volCol  = findCol(cols, ['production','produced','output','volume','litr','ltr','dispatch','packed']) || nums[0];
       const bfCol   = findCol(cols, ['b/f','bf','balance.forward','opening','stock.b']);
       const cfCol   = findCol(cols, ['c/f','cf','closing','carry.forward','stock.c']);
       const intakeC = findCol(cols, ['intake','received','milk.in','input']);
       const wastCol = findCol(cols, ['waste','loss','spoil','reject']);
 
-      const todayVol  = sumCol(todayRows, volCol);
-      const prevVol   = sumCol(prevRows,  volCol);
-      const chg = pct(todayVol, prevVol);
-      if (chg !== null && chg < -15) alerts.push({ type:'warn', msg:`Production output down ${Math.abs(chg).toFixed(1)}%`, sub:`${fmtU(todayVol,'L')} produced today` });
+      const isFiltered = dateFilter.preset !== 'all';
+      const aggRows  = isFiltered ? rows : todayRows;
+      const aggPrev  = isFiltered ? []  : prevRows;
+
+      const aggVol  = sumCol(aggRows, volCol);
+      const prevVol = sumCol(aggPrev, volCol);
+      const chg = isFiltered ? null : pct(aggVol, prevVol);
+      if (chg !== null && chg < -15) alerts.push({ type:'warn', msg:`Production output down ${Math.abs(chg).toFixed(1)}%`, sub:`${fmtU(aggVol,'L')} produced today` });
 
       body.innerHTML += `
-        <div class="snap-row"><span class="snap-lbl">🏭 Production Output</span>${trendBadge(chg)}</div>
+        <div class="snap-row"><span class="snap-lbl">Production Output</span>${isFiltered ? `<span class="tb-flat" style="font-size:10px;color:var(--text-muted)">period total</span>` : trendBadge(chg)}</div>
         <div class="snap-row">
-          <span class="snap-val snap-ltr">${fmtU(todayVol, 'L')}</span>
-          <span class="snap-sub">prev ${fmtU(prevVol,'L')}</span>
+          <span class="snap-val snap-ltr">${fmtU(aggVol, 'L')}</span>
+          ${!isFiltered ? `<span class="snap-sub">prev ${fmtU(prevVol,'L')}</span>` : ''}
         </div>`;
 
-      // ── Balance breakdown: B/F → components → C/F
       const dispCol2 = findCol(cols, ['dispatch','transfer','other.location','sent']);
       const rcptCol2 = findCol(cols, ['receipt','recon','received','incoming']);
       body.innerHTML += `<div class="snap-divider" style="margin:4px 0"></div>`;
-      if (bfCol)    { const v = sumCol(todayRows,bfCol);    body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">📥 Opening B/F</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#1b4f72">${fmtU(v,'L')}</span></div>`; }
-      if (rcptCol2) { const v = sumCol(todayRows,rcptCol2); if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">＋ Receipts/RECON</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#2d6a4f">${fmtU(v,'L')}</span></div>`; }
-      if (intakeC)  { const v = sumCol(todayRows,intakeC);  if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">＋ Milk In</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#2d6a4f">${fmtU(v,'L')}</span></div>`; }
-      { const v = sumCol(todayRows,volCol); if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">＋ Production</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#2d6a4f">${fmtU(v,'L')}</span></div>`; }
-      if (dispCol2) { const v = sumCol(todayRows,dispCol2); if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">－ Dispatches Out</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#b5460f">${fmtU(v,'L')}</span></div>`; }
-      if (wastCol)  { const v = sumCol(todayRows,wastCol);  if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;color:#a0402a;">－ Waste/Staff Tea</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#a0402a">${fmtU(v,'L')}</span></div>`; }
+      if (bfCol)    { const v = sumCol(aggRows,bfCol);    body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">Opening B/F</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#1b4f72">${fmtU(v,'L')}</span></div>`; }
+      if (rcptCol2) { const v = sumCol(aggRows,rcptCol2); if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">＋ Receipts/RECON</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#2d6a4f">${fmtU(v,'L')}</span></div>`; }
+      if (intakeC)  { const v = sumCol(aggRows,intakeC);  if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">＋ Milk In</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#2d6a4f">${fmtU(v,'L')}</span></div>`; }
+      { const v = sumCol(aggRows,volCol); if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">＋ Production</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#2d6a4f">${fmtU(v,'L')}</span></div>`; }
+      if (dispCol2) { const v = sumCol(aggRows,dispCol2); if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">－ Dispatches Out</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#b5460f">${fmtU(v,'L')}</span></div>`; }
+      if (wastCol)  { const v = sumCol(aggRows,wastCol);  if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;color:#a0402a;">－ Waste/Staff Tea</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#a0402a">${fmtU(v,'L')}</span></div>`; }
       if (cfCol)    {
-        const v = sumCol(todayRows,cfCol);
+        const v = sumCol(aggRows,cfCol);
         body.innerHTML += `<div class="snap-divider" style="margin:4px 0"></div>
-          <div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;font-weight:700;">📤 Closing C/F <span style="font-size:9px;font-weight:400;color:var(--text-faint)">(calculated)</span></span><span style="font-size:12px;font-weight:700;font-family:'DM Mono',monospace;color:#2d6a4f">${fmtU(v,'L')}</span></div>`;
+          <div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;font-weight:700;">Closing C/F <span style="font-size:9px;font-weight:400;color:var(--text-faint)">(calculated)</span></span><span style="font-size:12px;font-weight:700;font-family:'DM Mono',monospace;color:#2d6a4f">${fmtU(v,'L')}</span></div>`;
       }
 
     // ── SALES ────────────────────────────────────────────────────────────────
     } else if (n.includes('sale')) {
-      // Volume in litres
       const volCol = findCol(cols, ['volume','litr','ltr','qty','quantity','sold.l','sales.l','dispatched']) || nums.find(c => detectUnit(name,c) === 'L');
-      // Revenue in KES
       const kesCol = findCol(cols, ['amount','revenue','ksh','kes','value','total','income','sales.k','payment']) || nums.find(c => detectUnit(name,c) === 'KES');
-      // Any other numeric col not already used
       const otherCols = nums.filter(c => c !== volCol && c !== kesCol).slice(0,2);
 
-      const todayVol = volCol ? sumCol(todayRows, volCol) : 0;
-      const prevVol  = volCol ? sumCol(prevRows,  volCol) : 0;
-      const todayKes = kesCol ? sumCol(todayRows, kesCol) : 0;
-      const prevKes  = kesCol ? sumCol(prevRows,  kesCol) : 0;
-      const chgV = pct(todayVol, prevVol);
-      const chgK = pct(todayKes, prevKes);
+      const isFiltered = dateFilter.preset !== 'all';
+      const aggRows  = isFiltered ? rows : todayRows;
+      const aggPrev  = isFiltered ? []  : prevRows;
 
-      if (chgV !== null && chgV < -15) alerts.push({ type:'warn', msg:`Sales volume down ${Math.abs(chgV).toFixed(1)}%`, sub:`${fmtU(todayVol,'L')} sold today` });
-      if (chgK !== null && chgK > 20)  alerts.push({ type:'good', msg:`Sales revenue up ${chgK.toFixed(1)}%`, sub:`KES ${fmt(todayKes)} collected today` });
+      const aggVol  = volCol ? sumCol(aggRows, volCol) : 0;
+      const prevVol = volCol ? sumCol(aggPrev, volCol) : 0;
+      const aggKes  = kesCol ? sumCol(aggRows, kesCol) : 0;
+      const prevKes = kesCol ? sumCol(aggPrev, kesCol) : 0;
+      const chgV = isFiltered ? null : pct(aggVol,  prevVol);
+      const chgK = isFiltered ? null : pct(aggKes,  prevKes);
 
+      if (chgV !== null && chgV < -15) alerts.push({ type:'warn', msg:`Sales volume down ${Math.abs(chgV).toFixed(1)}%`, sub:`${fmtU(aggVol,'L')} sold today` });
+      if (chgK !== null && chgK > 20)  alerts.push({ type:'good', msg:`Sales revenue up ${chgK.toFixed(1)}%`, sub:`KES ${fmt(aggKes)} collected today` });
+
+      const periodTag = `<span class="tb-flat" style="font-size:10px;color:var(--text-muted)">period total</span>`;
       if (volCol) body.innerHTML += `
-        <div class="snap-row"><span class="snap-lbl">📦 Sales Volume</span>${trendBadge(chgV)}</div>
+        <div class="snap-row"><span class="snap-lbl">Sales Volume</span>${isFiltered ? periodTag : trendBadge(chgV)}</div>
         <div class="snap-row">
-          <span class="snap-val snap-ltr">${fmtU(todayVol,'L')}</span>
-          <span class="snap-sub">prev ${fmtU(prevVol,'L')}</span>
+          <span class="snap-val snap-ltr">${fmtU(aggVol,'L')}</span>
+          ${!isFiltered ? `<span class="snap-sub">prev ${fmtU(prevVol,'L')}</span>` : ''}
         </div>`;
 
       if (kesCol) {
         body.innerHTML += `<div class="snap-divider"></div>`;
         body.innerHTML += `
-          <div class="snap-row"><span class="snap-lbl">💰 Sales Revenue</span>${trendBadge(chgK)}</div>
+          <div class="snap-row"><span class="snap-lbl">Sales Revenue</span>${isFiltered ? periodTag : trendBadge(chgK)}</div>
           <div class="snap-row">
-            <span class="snap-val snap-ksh">KES ${fmt(todayKes)}</span>
-            <span class="snap-sub">prev KES ${fmt(prevKes)}</span>
+            <span class="snap-val snap-ksh">KES ${fmt(aggKes)}</span>
+            ${!isFiltered ? `<span class="snap-sub">prev KES ${fmt(prevKes)}</span>` : ''}
           </div>`;
       }
 
       otherCols.forEach(col => {
-        const v = sumCol(todayRows,col), u = detectUnit(name,col);
+        const v = sumCol(aggRows, col), u = detectUnit(name, col);
         if (v > 0) body.innerHTML += `<div class="snap-row" style="margin-top:1px;"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">↳ ${col}</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text-muted)">${fmtU(v,u)}</span></div>`;
       });
 
@@ -1326,62 +1336,69 @@ function renderOverview(container) {
       const creditCol = findCol(cols, ['credit','mpesa','cheque','invoice','debt','pending','receivable','credit.sale']);
       const totalCol  = findCol(cols, ['total','amount','revenue','income','collection']) || nums[0];
 
-      const todayCash   = cashCol   ? sumCol(todayRows, cashCol)   : 0;
-      const prevCash    = cashCol   ? sumCol(prevRows,  cashCol)   : 0;
-      const todayCredit = creditCol ? sumCol(todayRows, creditCol) : 0;
-      const prevCredit  = creditCol ? sumCol(prevRows,  creditCol) : 0;
-      const todayTotal  = totalCol  ? sumCol(todayRows, totalCol)  : todayCash + todayCredit;
-      const prevTotal   = totalCol  ? sumCol(prevRows,  totalCol)  : prevCash  + prevCredit;
-      const chgT = pct(todayTotal, prevTotal);
+      const isFiltered = dateFilter.preset !== 'all';
+      const aggRows  = isFiltered ? rows : todayRows;
+      const aggPrev  = isFiltered ? []  : prevRows;
 
-      if (chgT !== null && chgT < -20) alerts.push({ type:'warn', msg:`Finance collections down ${Math.abs(chgT).toFixed(1)}%`, sub:`KES ${fmt(todayTotal)} vs KES ${fmt(prevTotal)} previous` });
+      const aggCash    = cashCol   ? sumCol(aggRows, cashCol)   : 0;
+      const prevCash   = cashCol   ? sumCol(aggPrev, cashCol)   : 0;
+      const aggCredit  = creditCol ? sumCol(aggRows, creditCol) : 0;
+      const prevCredit = creditCol ? sumCol(aggPrev, creditCol) : 0;
+      const aggTotal   = totalCol  ? sumCol(aggRows, totalCol)  : aggCash + aggCredit;
+      const prevTotal  = totalCol  ? sumCol(aggPrev, totalCol)  : prevCash + prevCredit;
+      const chgT = isFiltered ? null : pct(aggTotal, prevTotal);
 
+      if (chgT !== null && chgT < -20) alerts.push({ type:'warn', msg:`Finance collections down ${Math.abs(chgT).toFixed(1)}%`, sub:`KES ${fmt(aggTotal)} vs KES ${fmt(prevTotal)} previous` });
+
+      const periodTag = `<span class="tb-flat" style="font-size:10px;color:var(--text-muted)">period total</span>`;
       body.innerHTML += `
-        <div class="snap-row"><span class="snap-lbl">🏦 Total Received</span>${trendBadge(chgT)}</div>
+        <div class="snap-row"><span class="snap-lbl">Total Received</span>${isFiltered ? periodTag : trendBadge(chgT)}</div>
         <div class="snap-row">
-          <span class="snap-val snap-ksh">KES ${fmt(todayTotal)}</span>
-          <span class="snap-sub">prev KES ${fmt(prevTotal)}</span>
+          <span class="snap-val snap-ksh">KES ${fmt(aggTotal)}</span>
+          ${!isFiltered ? `<span class="snap-sub">prev KES ${fmt(prevTotal)}</span>` : ''}
         </div>`;
 
       if (cashCol) {
-        const chgC = pct(todayCash, prevCash);
+        const chgC = isFiltered ? null : pct(aggCash, prevCash);
         body.innerHTML += `<div class="snap-divider"></div>
-          <div class="snap-row"><span class="snap-lbl">💵 Cash Received</span>${trendBadge(chgC)}</div>
+          <div class="snap-row"><span class="snap-lbl">Cash Received</span>${isFiltered ? periodTag : trendBadge(chgC)}</div>
           <div class="snap-row">
-            <span class="snap-val snap-cash">KES ${fmt(todayCash)}</span>
-            <span class="snap-sub">prev KES ${fmt(prevCash)}</span>
+            <span class="snap-val snap-cash">KES ${fmt(aggCash)}</span>
+            ${!isFiltered ? `<span class="snap-sub">prev KES ${fmt(prevCash)}</span>` : ''}
           </div>`;
       }
 
       if (creditCol) {
-        const chgCr = pct(todayCredit, prevCredit);
+        const chgCr = isFiltered ? null : pct(aggCredit, prevCredit);
         body.innerHTML += `<div class="snap-divider"></div>
-          <div class="snap-row"><span class="snap-lbl">🧾 Credit / Receivable</span>${trendBadge(chgCr)}</div>
+          <div class="snap-row"><span class="snap-lbl">Credit / Receivable</span>${isFiltered ? periodTag : trendBadge(chgCr)}</div>
           <div class="snap-row">
-            <span class="snap-val snap-credit">KES ${fmt(todayCredit)}</span>
-            <span class="snap-sub">prev KES ${fmt(prevCredit)}</span>
+            <span class="snap-val snap-credit">KES ${fmt(aggCredit)}</span>
+            ${!isFiltered ? `<span class="snap-sub">prev KES ${fmt(prevCredit)}</span>` : ''}
           </div>`;
       }
 
-      // Any other numeric cols not captured above
       nums.filter(c => c !== cashCol && c !== creditCol && c !== totalCol).slice(0,2).forEach(col => {
-        const v = sumCol(todayRows,col), u = detectUnit(name,col);
+        const v = sumCol(aggRows, col), u = detectUnit(name, col);
         if (v > 0) body.innerHTML += `<div class="snap-row" style="margin-top:1px;"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">↳ ${col}</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text-muted)">${fmtU(v,u)}</span></div>`;
       });
 
     // ── FALLBACK for any other sheet ─────────────────────────────────────────
     } else {
+      const isFiltered = dateFilter.preset !== 'all';
+      const aggRows  = isFiltered ? rows : todayRows;
+      const aggPrev  = isFiltered ? []  : prevRows;
       nums.slice(0, 4).forEach((col, i) => {
-        const unit = detectUnit(name, col);
-        const todayVal = sumCol(todayRows, col);
-        const prevVal  = sumCol(prevRows,  col);
-        const chg = pct(todayVal, prevVal);
+        const unit   = detectUnit(name, col);
+        const aggVal = sumCol(aggRows, col);
+        const prevVal = sumCol(aggPrev, col);
+        const chg = isFiltered ? null : pct(aggVal, prevVal);
         if (i > 0) body.innerHTML += `<div class="snap-divider"></div>`;
         body.innerHTML += `
-          <div class="snap-row"><span class="snap-lbl">${col}</span>${trendBadge(chg)}</div>
+          <div class="snap-row"><span class="snap-lbl">${col}</span>${isFiltered ? `<span class="tb-flat" style="font-size:10px;color:var(--text-muted)">period total</span>` : trendBadge(chg)}</div>
           <div class="snap-row">
-            <span class="snap-val" style="color:${color.main}">${fmtU(todayVal, unit)}</span>
-            <span class="snap-sub">prev ${fmtU(prevVal, unit)}</span>
+            <span class="snap-val" style="color:${color.main}">${fmtU(aggVal, unit)}</span>
+            ${!isFiltered ? `<span class="snap-sub">prev ${fmtU(prevVal, unit)}</span>` : ''}
           </div>`;
       });
     }
