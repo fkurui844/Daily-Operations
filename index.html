@@ -187,7 +187,8 @@ function detectUnit(sheetName, colName) {
   const s = (colName   || '').toLowerCase();
   const n = (sheetName || '').toLowerCase();
   if (/\b(l|ltr|litr|litre|liter|litres|liters|volume)\b/.test(s)) return 'L';
-  if (n.includes('milk'))  return 'L';
+  if (/\b(b\/?f|c\/?f|brought.forward|carried.forward|opening|closing)\b/.test(s)) return 'L';
+  if (n.includes('milk') || n.includes('dairy') || n.includes('prod'))  return 'L';
   if (/\b(kes|ksh|amount|revenue|cost|expense|income|profit|loss|price|value|sales|payment|cash|fee|total)\b/.test(s)) return 'KES';
   if (/\b(kg|kgs|kilogram|weight)\b/.test(s)) return 'kg';
   if (/\b(qty|quantity|units|pcs|pieces|count|no\.?|number)\b/.test(s)) return 'units';
@@ -203,6 +204,67 @@ function fmtU(v, unit, dp) {
   if (v == null || isNaN(v)) return '—';
   const n = Number(v).toLocaleString('en-KE', { maximumFractionDigits: dp ?? (Math.abs(v) > 999 ? 0 : 1), minimumFractionDigits: 0 });
   return unit ? `${n} ${unit}` : n;
+}
+
+// ── Production B/F → C/F calculation ─────────────────────────────────────────
+// For production sheets:
+//   C/F(L) = B/F(L) + Receipts(L) + Production(L) - Dispatches(L) - Wastage(L)
+//   B/F of next row = C/F of current row
+function applyProductionCalculations(cols, rows) {
+  // Identify relevant columns (case-insensitive fuzzy match)
+  function matchCol(patterns) {
+    for (const pat of patterns) {
+      const re = new RegExp(pat, 'i');
+      const c = cols.find(c => re.test(c));
+      if (c) return c;
+    }
+    return null;
+  }
+
+  const bfCol       = matchCol(['b\\/?f','brought.forward','opening.stock','opening.balance','balance.b\\/?f']);
+  const cfCol       = matchCol(['c\\/?f','carried.forward','closing.stock','closing.balance','balance.c\\/?f']);
+  const receiptCol  = matchCol(['receipt','recon','received','location.*in','incoming']);
+  const prodCol     = matchCol(['production','produced','output']);
+  const dispatchCol = matchCol(['dispatch','transfer.*out','sent.*out','other.location']);
+  const wasteCol    = matchCol(['waste','staff.tea','wastage','loss','spoil','reject']);
+
+  if (!bfCol || !cfCol) return rows; // Can't compute without both B/F and C/F columns
+
+  const computed = rows.map((row, i) => {
+    const newRow = { ...row };
+
+    // Auto-fill B/F from previous row's C/F (skip first row)
+    if (i > 0) {
+      const prevCF = rows[i - 1][cfCol];
+      if (prevCF != null && typeof prevCF === 'number') {
+        newRow[bfCol] = prevCF;
+        newRow['_bf_auto'] = true; // flag that B/F was auto-populated
+      }
+    }
+
+    // Calculate C/F
+    const bf       = typeof newRow[bfCol]  === 'number' ? newRow[bfCol]  : 0;
+    const receipt  = receiptCol  && typeof newRow[receiptCol]  === 'number' ? newRow[receiptCol]  : 0;
+    const prod     = prodCol     && typeof newRow[prodCol]     === 'number' ? newRow[prodCol]     : 0;
+    const dispatch = dispatchCol && typeof newRow[dispatchCol] === 'number' ? newRow[dispatchCol] : 0;
+    const waste    = wasteCol    && typeof newRow[wasteCol]    === 'number' ? newRow[wasteCol]    : 0;
+
+    const calculatedCF = bf + receipt + prod - dispatch - waste;
+    newRow[cfCol] = calculatedCF;
+    newRow['_cf_calc'] = true; // flag that C/F was calculated
+
+    return newRow;
+  });
+
+  return computed;
+}
+
+// Detect if a sheet is a production/milk balance sheet
+function isProductionSheet(name, cols) {
+  const n = (name || '').toLowerCase();
+  if (n.includes('prod') || n.includes('milk') || n.includes('dairy') || n.includes('balance')) return true;
+  const colStr = cols.join(' ').toLowerCase();
+  return /\bb\/?f\b/.test(colStr) && /\bc\/?f\b/.test(colStr);
 }
 
 // ── Sheet helpers ─────────────────────────────────────────────────────────────
@@ -342,6 +404,10 @@ async function loadAllData() {
       try {
         const data = await fetchSheet(name);
         if (data.cols.length && data.rows.length) {
+          // Apply B/F → C/F calculations for production/balance sheets
+          if (isProductionSheet(name, data.cols)) {
+            data.rows = applyProductionCalculations(data.cols, data.rows);
+          }
           allData[name] = data;
           sheetMeta.push({ name, color: TAB_COLORS[sheetMeta.length % TAB_COLORS.length] });
         }
@@ -659,10 +725,21 @@ function renderOverview(container) {
           <span class="snap-sub">prev ${fmtU(prevVol,'L')}</span>
         </div>`;
 
-      if (bfCol) { const v = sumCol(todayRows,bfCol); body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">↳ Opening (B/F)</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text-muted)">${fmtU(v,'L')}</span></div>`; }
-      if (intakeC){ const v = sumCol(todayRows,intakeC); body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">↳ Milk In</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text-muted)">${fmtU(v,'L')}</span></div>`; }
-      if (cfCol)  { const v = sumCol(todayRows,cfCol);  body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">↳ Closing (C/F)</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text-muted)">${fmtU(v,'L')}</span></div>`; }
-      if (wastCol){ const v = sumCol(todayRows,wastCol); if(v>0) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;color:#a0402a;">↳ Waste/Loss</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#a0402a">${fmtU(v,'L')}</span></div>`; }
+      // ── Balance breakdown: B/F → components → C/F
+      const dispCol2 = findCol(cols, ['dispatch','transfer','other.location','sent']);
+      const rcptCol2 = findCol(cols, ['receipt','recon','received','incoming']);
+      body.innerHTML += `<div class="snap-divider" style="margin:4px 0"></div>`;
+      if (bfCol)    { const v = sumCol(todayRows,bfCol);    body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">📥 Opening B/F</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#1b4f72">${fmtU(v,'L')}</span></div>`; }
+      if (rcptCol2) { const v = sumCol(todayRows,rcptCol2); if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">＋ Receipts/RECON</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#2d6a4f">${fmtU(v,'L')}</span></div>`; }
+      if (intakeC)  { const v = sumCol(todayRows,intakeC);  if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">＋ Milk In</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#2d6a4f">${fmtU(v,'L')}</span></div>`; }
+      { const v = sumCol(todayRows,volCol); if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">＋ Production</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#2d6a4f">${fmtU(v,'L')}</span></div>`; }
+      if (dispCol2) { const v = sumCol(todayRows,dispCol2); if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">－ Dispatches Out</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#b5460f">${fmtU(v,'L')}</span></div>`; }
+      if (wastCol)  { const v = sumCol(todayRows,wastCol);  if(v) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;color:#a0402a;">－ Waste/Staff Tea</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#a0402a">${fmtU(v,'L')}</span></div>`; }
+      if (cfCol)    {
+        const v = sumCol(todayRows,cfCol);
+        body.innerHTML += `<div class="snap-divider" style="margin:4px 0"></div>
+          <div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;font-weight:700;">📤 Closing C/F <span style="font-size:9px;font-weight:400;color:var(--text-faint)">(calculated)</span></span><span style="font-size:12px;font-weight:700;font-family:'DM Mono',monospace;color:#2d6a4f">${fmtU(v,'L')}</span></div>`;
+      }
 
     // ── SALES ────────────────────────────────────────────────────────────────
     } else if (n.includes('sale')) {
@@ -907,7 +984,104 @@ function renderSheet(name, sheet, container) {
     <div class="page-subtitle">${rows.length} rows · ${cols.length} columns: ${cols.join(', ')}</div>`;
   container.appendChild(hdr);
 
-  // Metric cards — one per numeric column, label = exact column header
+  // ── Production Balance Panel (B/F → C/F) for production/balance sheets ──
+  if (isProductionSheet(name, cols)) {
+    function matchColLocal(patterns) {
+      for (const pat of patterns) {
+        const re = new RegExp(pat, 'i');
+        const c = cols.find(c => re.test(c));
+        if (c) return c;
+      }
+      return null;
+    }
+    const bfC   = matchColLocal(['b\\/?f','brought.forward','opening']);
+    const cfC   = matchColLocal(['c\\/?f','carried.forward','closing']);
+    const rcpC  = matchColLocal(['receipt','recon','received','incoming']);
+    const prdC  = matchColLocal(['production','produced','output']);
+    const dspC  = matchColLocal(['dispatch','transfer','other.location','sent']);
+    const wstC  = matchColLocal(['waste','staff.tea','wastage','loss']);
+
+    if (bfC && cfC) {
+      const balPanel = document.createElement('div');
+      balPanel.className = 'card';
+      balPanel.style.marginBottom = '1rem';
+
+      // Table: one row per data row showing all components
+      const rowsHTML = rows.map((row, i) => {
+        const label   = row[getLabelCol(cols, rows)] ?? `Row ${i+1}`;
+        const bf      = typeof row[bfC]  === 'number' ? row[bfC]  : null;
+        const rcpt    = rcpC && typeof row[rcpC] === 'number' ? row[rcpC] : null;
+        const prod    = prdC && typeof row[prdC] === 'number' ? row[prdC] : null;
+        const dsp     = dspC && typeof row[dspC] === 'number' ? row[dspC] : null;
+        const wst     = wstC && typeof row[wstC] === 'number' ? row[wstC] : null;
+        const cf      = typeof row[cfC]  === 'number' ? row[cfC]  : null;
+        const isAuto  = row['_cf_calc'];
+        const bfAuto  = row['_bf_auto'];
+
+        const tdN = (v, color) => v != null
+          ? `<td class="td-num" style="color:${color||'inherit'}">${fmt(v)} L</td>`
+          : `<td class="td-num" style="color:var(--text-faint)">—</td>`;
+
+        return `<tr>
+          <td style="font-size:12px;white-space:nowrap">${String(label).substring(0,22)}</td>
+          ${tdN(bf,   bfAuto ? '#1b4f72' : null)}
+          ${tdN(rcpt, '#2d6a4f')}
+          ${tdN(prod, '#2d6a4f')}
+          ${tdN(dsp,  '#b5460f')}
+          ${tdN(wst,  '#a0402a')}
+          <td class="td-num" style="font-weight:700;color:${cf != null && cf >= 0 ? '#2d6a4f' : '#a0402a'};background:var(--green-light)">
+            ${cf != null ? fmt(cf) + ' L' : '—'}${isAuto ? ' <span style="font-size:9px;font-weight:400;color:var(--text-faint)">⚙</span>' : ''}
+          </td>
+        </tr>`;
+      }).join('');
+
+      balPanel.innerHTML = `
+        <div class="card-header">
+          <div>
+            <div class="card-title">🧮 Production Balance — B/F → C/F</div>
+            <div class="card-sub">C/F = B/F + Receipts + Production − Dispatches − Wastage · <span style="color:#2d6a4f;font-weight:600">⚙ = auto-calculated</span> · B/F auto-carries from previous C/F</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Period / Row</th>
+              <th style="text-align:right;color:#1b4f72">B/F (L)</th>
+              ${rcpC  ? `<th style="text-align:right;color:#2d6a4f">Receipts (L)</th>` : ''}
+              ${prdC  ? `<th style="text-align:right;color:#2d6a4f">Production (L)</th>` : ''}
+              ${dspC  ? `<th style="text-align:right;color:#b5460f">Dispatches (L)</th>` : ''}
+              ${wstC  ? `<th style="text-align:right;color:#a0402a">Wastage (L)</th>` : ''}
+              <th style="text-align:right;color:#2d6a4f;background:var(--green-light)">C/F (L) ⚙</th>
+            </tr></thead>
+            <tbody>${rowsHTML}</tbody>
+          </table>
+        </div>`;
+
+      // Totals row
+      const totBF  = bfC  ? colSum(rows, bfC)  : null;
+      const totRcp = rcpC ? colSum(rows, rcpC) : null;
+      const totPrd = prdC ? colSum(rows, prdC) : null;
+      const totDsp = dspC ? colSum(rows, dspC) : null;
+      const totWst = wstC ? colSum(rows, wstC) : null;
+      const totCF  = cfC  ? colSum(rows, cfC)  : null;
+
+      const totalsBar = document.createElement('div');
+      totalsBar.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;padding:10px 14px 12px;border-top:1px solid var(--border);font-size:11px;';
+      const addTot = (label, val, color) => {
+        if (val == null) return;
+        totalsBar.innerHTML += `<span style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-family:'DM Mono',monospace;"><span style="color:var(--text-muted)">${label}:</span> <strong style="color:${color}">${fmt(val)} L</strong></span>`;
+      };
+      addTot('Σ B/F', totBF, '#1b4f72');
+      addTot('Σ Receipts', totRcp, '#2d6a4f');
+      addTot('Σ Production', totPrd, '#2d6a4f');
+      addTot('Σ Dispatches', totDsp, '#b5460f');
+      addTot('Σ Wastage', totWst, '#a0402a');
+      addTot('Σ C/F', totCF, '#2d6a4f');
+      balPanel.appendChild(totalsBar);
+
+      container.appendChild(balPanel);
+    }
+  }
   if (nums.length) {
     const grid = document.createElement('div');
     grid.className = 'metrics-grid';
