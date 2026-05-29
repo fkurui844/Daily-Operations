@@ -429,12 +429,15 @@ function getFilterWindow() {
 
   // For relative presets, anchor to the latest date found across all loaded sheets,
   // capped at today so future-dated rows (typos, formulas) don't skew the window.
+  // Only rows with actual non-zero data are considered — blank placeholder rows are ignored.
   function latestDataDate() {
     let latest = null;
     Object.values(allData).forEach(({ cols, rows }) => {
       const dateCol = getDateCol(cols, rows);
       if (!dateCol) return;
       rows.forEach(r => {
+        // Skip placeholder rows (all numeric values are 0 or null)
+        if (!rowHasRealData(r)) return;
         const d = parseRowDate(r[dateCol]);
         if (!d) return;
         const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -461,14 +464,26 @@ function getFilterWindow() {
   return { from: null, to: null }; // 'all'
 }
 
-// Filter rows by the current date filter window using the detected date column
+// Returns true if a row has at least one real (non-zero, non-null) numeric value.
+// Rows that exist only as date placeholders (e.g. 29/05, 30/05, 31/05 with 0.00
+// in every cell) are treated as "not yet entered" and excluded from aggregations.
+function rowHasRealData(row) {
+  return Object.entries(row).some(([k, v]) =>
+    !k.startsWith('_') && typeof v === 'number' && v !== 0 && !isNaN(v)
+  );
+}
+
+// Filter rows by the current date filter window using the detected date column.
+// Also strips out placeholder rows that have no real numeric data.
 function applyDateFilter(rows, dateCol) {
   const { from, to } = getFilterWindow();
-  if (!from && !to) return rows;   // no filter active
-  if (!dateCol) return rows;       // can't filter without dates
-  return rows.filter(r => {
+  // Always strip empty placeholder rows regardless of date filter
+  const realRows = rows.filter(rowHasRealData);
+  if (!from && !to) return realRows;  // no date filter active
+  if (!dateCol) return realRows;      // can't date-filter without a date column
+  return realRows.filter(r => {
     const d = parseRowDate(r[dateCol]);
-    if (!d) return true; // keep undated rows
+    if (!d) return false; // when a date filter is active, exclude rows with no parseable date
     const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     if (from && day < from) return false;
     if (to   && day > to)   return false;
