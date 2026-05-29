@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dairy Operations Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f4f1eb;
+    --surface: #ffffff;
+    --surface2: #faf8f4;
+    --border: #e8e3d8;
+    --text: #1a1714;
+    --text-muted: #7a7268;
+    --text-faint: #b0a99e;
+    --green: #2d6a4f;
+    --green-light: #d8f3dc;
+    --amber: #b5460f;
+    --amber-light: #fde8d8;
+    --blue: #1b4f72;
+    --blue-light: #d6eaf8;
+    --teal: #0e6655;
+    --teal-light: #d5f5e3;
+    --red: #922b21;
+    --red-light: #fadbd8;
+    --accent: #2d6a4f;
+    --radius: 10px;
+    --radius-lg: 16px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* Header */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+  }
+  .header-brand { display: flex; align-items: center; gap: 10px; }
+  .brand-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--green); display: flex; align-items: center;
+    justify-content: center; font-size: 16px;
+  }
+  .brand-name { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+  .brand-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .header-right { font-size: 12px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+
+  /* Layout */
+  .layout { display: flex; min-height: calc(100vh - 60px); }
+
+  /* Sidebar */
+  .sidebar {
+    width: 200px; flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 1.25rem 0;
+    position: sticky;
+    top: 60px;
+    height: calc(100vh - 60px);
+    overflow-y: auto;
+  }
+  .sidebar-section { padding: 0 1rem; margin-bottom: 1.5rem; }
+  .sidebar-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text-faint);
+    padding: 0 0.5rem; margin-bottom: 4px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 8px;
+    cursor: pointer; transition: all 0.15s;
+    font-size: 13px; color: var(--text-muted);
+    border: none; background: none; width: 100%; text-align: left;
+  }
+  .nav-item:hover { background: var(--bg); color: var(--text); }
+  .nav-item.active { background: var(--green-light); color: var(--green); font-weight: 500; }
+  .nav-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Main */
+  .main { flex: 1; padding: 1.75rem 2rem; overflow-x: hidden; max-width: calc(100vw - 200px); }
+
+  /* Page header */
+  .page-header { margin-bottom: 1.5rem; }
+  .page-title { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; }
+  .page-subtitle { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+
+  /* Metrics grid */
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 1.75rem; }
+  .metric-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 1.1rem 1.25rem;
+  }
+  .metric-label { font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .metric-value { font-size: 26px; font-weight: 600; letter-spacing: -1px; line-height: 1.1; }
+  .metric-unit { font-size: 13px; font-weight: 400; color: var(--text-muted); margin-left: 2px; }
+  .metric-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 500; padding: 3px 8px;
+    border-radius: 20px; margin-top: 6px;
+  }
+  .badge-green { background: var(--green-light); color: var(--green); }
+  .badge-amber { background: var(--amber-light); color: var(--amber); }
+  .badge-blue { background: var(--blue-light); color: var(--blue); }
+  .badge-teal { background: var(--teal-light); color: var(--teal); }
+
+  /* Cards */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .card-title { font-size: 14px; font-weight: 600; }
+  .card-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Chart containers */
+  .chart-container { position: relative; }
+  .charts-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { border-bottom: 1px solid var(--border); }
+  th { padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--bg); }
+  .td-num { font-family: 'DM Mono', monospace; font-size: 12px; }
+
+  /* Color dots */
+  .dot-green { background: var(--green); }
+  .dot-amber { background: #e67e22; }
+  .dot-blue { background: var(--blue); }
+  .dot-teal { background: var(--teal); }
+
+  /* Loading / Error */
+  .state-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 3rem 2rem;
+    text-align: center;
+  }
+  .spinner {
+    width: 36px; height: 36px; border: 3px solid var(--border);
+    border-top-color: var(--green); border-radius: 50%;
+    animation: spin 0.7s linear infinite; margin: 0 auto 1rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .state-title { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
+  .state-sub { font-size: 13px; color: var(--text-muted); max-width: 420px; margin: 0 auto; line-height: 1.6; }
+  .error-box { border-color: #f5c6c6; background: #fff8f8; }
+  .error-icon { font-size: 28px; margin-bottom: 10px; }
+
+  /* Legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; }
+
+  /* Refresh btn */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; transition: all 0.15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .btn:hover { background: var(--bg); }
+  .btn-primary { background: var(--green); color: white; border-color: var(--green); }
+  .btn-primary:hover { background: #245a41; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .main { max-width: 100vw; padding: 1rem; }
+    .header { padding: 0 1rem; }
+  }
+
+  .hidden { display: none !important; }
+  .fade-in { animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .summary-bar {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    border: 1px solid var(--border); border-radius: var(--radius-lg);
+    overflow: hidden; margin-bottom: 1.75rem; background: var(--surface);
+  }
+  .summary-bar-item {
+    padding: 1rem 1.25rem; border-right: 1px solid var(--border);
+    cursor: pointer; transition: background 0.15s;
+  }
+  .summary-bar-item:last-child { border-right: none; }
+  .summary-bar-item:hover { background: var(--bg); }
+  .summary-bar-item.active { background: var(--green-light); }
+  .sbi-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin-bottom: 4px; }
+  .sbi-value { font-size: 19px; font-weight: 600; letter-spacing: -0.5px; }
+  .sbi-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+  @media (max-width: 600px) {
+    .summary-bar { grid-template-columns: repeat(2, 1fr); }
+    .summary-bar-item:nth-child(2) { border-right: none; }
+    .summary-bar-item:nth-child(1), .summary-bar-item:nth-child(2) { border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-brand">
+    <div class="brand-icon">🥛</div>
+    <div>
+      <div class="brand-name">Dairy Operations</div>
+      <div class="brand-sub">Live Dashboard</div>
+    </div>
+  </div>
+  <div class="header-right" id="last-updated">Loading…</div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Departments</div>
+      <button class="nav-item active" onclick="switchTab('overview')" id="nav-overview">
+        <span class="nav-dot" style="background:#888"></span> Overview
+      </button>
+      <button class="nav-item" onclick="switchTab('Milk Intake')" id="nav-Milk Intake">
+        <span class="nav-dot dot-green"></span> Milk Intake
+      </button>
+      <button class="nav-item" onclick="switchTab('Production')" id="nav-Production">
+        <span class="nav-dot dot-amber"></span> Production
+      </button>
+      <button class="nav-item" onclick="switchTab('Sales')" id="nav-Sales">
+        <span class="nav-dot dot-blue"></span> Sales
+      </button>
+      <button class="nav-item" onclick="switchTab('Finance')" id="nav-Finance">
+        <span class="nav-dot dot-teal"></span> Finance
+      </button>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Actions</div>
+      <button class="nav-item" onclick="loadAllData()">↻ Refresh data</button>
+    </div>
+  </nav>
+
+  <main class="main">
+    <div id="loading-state" class="state-box">
+      <div class="spinner"></div>
+      <div class="state-title" id="loading-msg">Connecting to Google Sheets…</div>
+      <div class="state-sub">Fetching data from Milk Intake, Production, Sales and Finance tabs.</div>
+    </div>
+
+    <div id="error-state" class="state-box error-box hidden">
+      <div class="error-icon">⚠️</div>
+      <div class="state-title">Could not load data</div>
+      <div class="state-sub" id="error-detail">
+        Make sure the sheet is shared as <strong>"Anyone with the link → Viewer"</strong> and published to the web via File → Share → Publish to web.
+      </div>
+      <br>
+      <button class="btn btn-primary" onclick="loadAllData()">Try again</button>
+    </div>
+
+    <div id="dashboard" class="hidden"></div>
+  </main>
+</div>
+
+<script>
+const FILE_ID = '13LiH5I_0qdB6REtOx26cOpBBQLhkJceArjNwc1uUPPM';
+const SHEETS = ['Milk Intake', 'Production', 'Sales', 'Finance'];
+const COLORS = {
+  'Milk Intake': '#2d6a4f',
+  'Production':  '#c97b2a',
+  'Sales':       '#1b4f72',
+  'Finance':     '#0e6655'
+};
+const LIGHT_COLORS = {
+  'Milk Intake': '#d8f3dc',
+  'Production':  '#fde8d8',
+  'Sales':       '#d6eaf8',
+  'Finance':     '#d5f5e3'
+};
+
+let allData = {};
+let activeTab = 'overview';
+let chartInstances = {};
+
+// ── Fetch one sheet ──────────────────────────────────────────────────────────
+async function fetchSheet(name) {
+  const url = `https://docs.google.com/spreadsheets/d/${FILE_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(name)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const text = await res.text();
+  const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
+  if (!match) throw new Error('Unexpected response format');
+  const json = JSON.parse(match[1]);
+  if (!json.table) throw new Error('No table data');
+  const cols = json.table.cols.map(c => c.label || c.id || '').filter(Boolean);
+  const rows = (json.table.rows || []).map(r => {
+    const obj = {};
+    if (r && r.c) r.c.forEach((cell, i) => { if (cols[i]) obj[cols[i]] = cell ? cell.v : null; });
+    return obj;
+  }).filter(r => Object.values(r).some(v => v !== null && v !== ''));
+  return { cols, rows };
+}
+
+// ── Load all sheets ──────────────────────────────────────────────────────────
+async function loadAllData() {
+  document.getElementById('loading-state').classList.remove('hidden');
+  document.getElementById('error-state').classList.add('hidden');
+  document.getElementById('dashboard').classList.add('hidden');
+  allData = {};
+
+  const errors = [];
+  for (const name of SHEETS) {
+    document.getElementById('loading-msg').textContent = `Loading ${name}…`;
+    try { allData[name] = await fetchSheet(name); }
+    catch (e) { errors.push(`${name}: ${e.message}`); }
+  }
+
+  document.getElementById('loading-state').classList.add('hidden');
+
+  if (Object.keys(allData).length === 0) {
+    document.getElementById('error-detail').textContent = 'Could not load any sheets. ' + errors.join(' | ');
+    document.getElementById('error-state').classList.remove('hidden');
+    return;
+  }
+
+  const now = new Date();
+  document.getElementById('last-updated').textContent =
+    'Updated ' + now.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+
+  document.getElementById('dashboard').classList.remove('hidden');
+  renderTab(activeTab);
+}
+
+// ── Switch tab ───────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  const navId = 'nav-' + tab;
+  if (document.getElementById(navId)) document.getElementById(navId).classList.add('active');
+  renderTab(tab);
+}
+
+function renderTab(tab) {
+  destroyCharts();
+  const dash = document.getElementById('dashboard');
+  dash.innerHTML = '';
+  if (tab === 'overview') renderOverview(dash);
+  else if (allData[tab]) renderSheet(tab, allData[tab], dash);
+}
+
+function destroyCharts() {
+  Object.values(chartInstances).forEach(c => { try { c.destroy(); } catch(e){} });
+  chartInstances = {};
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function fmt(v, dp = 0) {
+  if (v == null || isNaN(v)) return '—';
+  return Number(v).toLocaleString('en-KE', { maximumFractionDigits: dp, minimumFractionDigits: dp });
+}
+
+function getNumCols(cols, rows) {
+  return cols.filter(c => rows.some(r => typeof r[c] === 'number' && r[c] !== 0));
+}
+
+function colSum(rows, col) {
+  return rows.reduce((s, r) => s + (typeof r[col] === 'number' ? r[col] : 0), 0);
+}
+
+function colMax(rows, col) {
+  return Math.max(...rows.map(r => typeof r[col] === 'number' ? r[col] : 0));
+}
+
+function makeCanvas(id, height = 240) {
+  const wrap = document.createElement('div');
+  wrap.className = 'chart-container';
+  wrap.style.height = height + 'px';
+  const c = document.createElement('canvas');
+  c.id = id;
+  wrap.appendChild(c);
+  return { wrap, canvas: c };
+}
+
+// ── Overview ─────────────────────────────────────────────────────────────────
+function renderOverview(container) {
+  container.classList.add('fade-in');
+
+  // Page header
+  container.innerHTML = `
+    <div class="page-header">
+      <div class="page-title">Operations Overview</div>
+      <div class="page-subtitle">Cross-department summary — all figures from live Google Sheet data</div>
+    </div>`;
+
+  // Summary bar
+  const summaryBar = document.createElement('div');
+  summaryBar.className = 'summary-bar';
+  const deptConfig = [
+    { key: 'Milk Intake', icon: '🐄', unit: 'L' },
+    { key: 'Production', icon: '🏭', unit: 'units' },
+    { key: 'Sales', icon: '💰', unit: 'KES' },
+    { key: 'Finance', icon: '📊', unit: 'KES' },
+  ];
+  deptConfig.forEach(d => {
+    const sheet = allData[d.key];
+    let total = '—', rows = 0;
+    if (sheet) {
+      rows = sheet.rows.length;
+      const nums = getNumCols(sheet.cols, sheet.rows);
+      if (nums.length) total = fmt(colSum(sheet.rows, nums[0]));
+    }
+    const item = document.createElement('div');
+    item.className = 'summary-bar-item';
+    item.onclick = () => switchTab(d.key);
+    item.innerHTML = `
+      <div class="sbi-label">${d.key}</div>
+      <div class="sbi-value">${total}</div>
+      <div class="sbi-sub">${rows} records · ${d.unit}</div>`;
+    summaryBar.appendChild(item);
+  });
+  container.appendChild(summaryBar);
+
+  // Mini charts for each department
+  const chartsRow = document.createElement('div');
+  chartsRow.className = 'charts-row';
+
+  SHEETS.forEach(name => {
+    const sheet = allData[name];
+    if (!sheet) return;
+    const nums = getNumCols(sheet.cols, sheet.rows);
+    if (!nums.length || sheet.rows.length < 2) return;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    const labelCol = sheet.cols[0];
+    const valueCol = nums[0];
+    const data = sheet.rows.slice(0, 14);
+    const labels = data.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : '');
+    const values = data.map(r => typeof r[valueCol] === 'number' ? r[valueCol] : 0);
+
+    card.innerHTML = `
+      <div class="card-header">
+        <div>
+          <div class="card-title">${name}</div>
+          <div class="card-sub">${valueCol} · ${sheet.rows.length} records</div>
+        </div>
+        <span class="metric-badge badge-${name === 'Milk Intake' ? 'green' : name === 'Production' ? 'amber' : name === 'Sales' ? 'blue' : 'teal'}">${fmt(colSum(sheet.rows, valueCol))}</span>
+      </div>`;
+
+    const chartId = 'ov-' + name.replace(/\s/g, '');
+    const { wrap, canvas } = makeCanvas(chartId, 180);
+    card.appendChild(wrap);
+    chartsRow.appendChild(card);
+
+    setTimeout(() => {
+      chartInstances[chartId] = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            borderColor: COLORS[name],
+            backgroundColor: COLORS[name] + '18',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 2,
+            pointHoverRadius: 5
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 6 } },
+            y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) } }
+          }
+        }
+      });
+    }, 50);
+  });
+
+  container.appendChild(chartsRow);
+}
+
+// ── Single sheet view ─────────────────────────────────────────────────────────
+function renderSheet(name, sheet, container) {
+  container.classList.add('fade-in');
+  const { cols, rows } = sheet;
+  const nums = getNumCols(cols, rows);
+  const labelCol = cols[0];
+  const color = COLORS[name];
+  const lightColor = LIGHT_COLORS[name];
+  const badgeClass = name === 'Milk Intake' ? 'green' : name === 'Production' ? 'amber' : name === 'Sales' ? 'blue' : 'teal';
+
+  // Page header
+  const hdr = document.createElement('div');
+  hdr.className = 'page-header';
+  hdr.innerHTML = `
+    <div class="page-title">${name}</div>
+    <div class="page-subtitle">${rows.length} records · ${nums.length} numeric columns</div>`;
+  container.appendChild(hdr);
+
+  // Metric cards
+  if (nums.length) {
+    const grid = document.createElement('div');
+    grid.className = 'metrics-grid';
+    nums.slice(0, 6).forEach(col => {
+      const total = colSum(rows, col);
+      const avg = total / rows.filter(r => typeof r[col] === 'number').length;
+      const card = document.createElement('div');
+      card.className = 'metric-card';
+      card.innerHTML = `
+        <div class="metric-label">${col}</div>
+        <div class="metric-value">${fmt(total, total > 100000 ? 0 : total > 100 ? 0 : 1)}</div>
+        <div class="metric-badge badge-${badgeClass}" style="margin-top:6px">avg ${fmt(avg, avg > 100 ? 0 : 1)}</div>`;
+      grid.appendChild(card);
+    });
+    container.appendChild(grid);
+  }
+
+  // Charts row
+  if (nums.length && rows.length > 1) {
+    const chartsRow = document.createElement('div');
+    chartsRow.className = 'charts-row';
+
+    // Primary bar/line chart
+    if (rows.length >= 2) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      const primaryCol = nums[0];
+      const maxShow = 20;
+      const slicedRows = rows.slice(0, maxShow);
+      card.innerHTML = `
+        <div class="card-header">
+          <div><div class="card-title">${primaryCol} by ${labelCol}</div></div>
+        </div>`;
+      const chartId = name.replace(/\s/g,'') + '-bar';
+      const { wrap, canvas } = makeCanvas(chartId, 260);
+      card.appendChild(wrap);
+      chartsRow.appendChild(card);
+
+      setTimeout(() => {
+        chartInstances[chartId] = new Chart(canvas, {
+          type: 'bar',
+          data: {
+            labels: slicedRows.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 12) : ''),
+            datasets: [{
+              label: primaryCol,
+              data: slicedRows.map(r => typeof r[primaryCol] === 'number' ? r[primaryCol] : 0),
+              backgroundColor: color + 'cc',
+              borderColor: color,
+              borderWidth: 1,
+              borderRadius: 4
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: rows.length > 12 } },
+              y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) } }
+            }
+          }
+        });
+      }, 50);
+    }
+
+    // Multi-series line if multiple numeric cols
+    if (nums.length > 1) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      const seriesCols = nums.slice(0, 4);
+      card.innerHTML = `<div class="card-header"><div><div class="card-title">Multi-series trend</div></div></div>`;
+      const chartId = name.replace(/\s/g,'') + '-line';
+      const maxShow = 20;
+      const slicedRows = rows.slice(0, maxShow);
+      const { wrap, canvas } = makeCanvas(chartId, 260);
+
+      // Legend
+      const legendEl = document.createElement('div');
+      legendEl.className = 'legend';
+      const lineColors = [color, '#c97b2a', '#1b4f72', '#0e6655', '#8e44ad', '#c0392b'];
+      seriesCols.forEach((col, i) => {
+        legendEl.innerHTML += `<div class="legend-item"><div class="legend-swatch" style="background:${lineColors[i % lineColors.length]}"></div>${col}</div>`;
+      });
+      card.appendChild(legendEl);
+      card.appendChild(wrap);
+      chartsRow.appendChild(card);
+
+      setTimeout(() => {
+        chartInstances[chartId] = new Chart(canvas, {
+          type: 'line',
+          data: {
+            labels: slicedRows.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : ''),
+            datasets: seriesCols.map((col, i) => ({
+              label: col,
+              data: slicedRows.map(r => typeof r[col] === 'number' ? r[col] : 0),
+              borderColor: lineColors[i % lineColors.length],
+              backgroundColor: 'transparent',
+              borderWidth: 2,
+              tension: 0.3,
+              pointRadius: 3,
+              borderDash: i % 2 === 1 ? [4, 3] : []
+            }))
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 8 } },
+              y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) } }
+            }
+          }
+        });
+      }, 80);
+    }
+
+    container.appendChild(chartsRow);
+  }
+
+  // Data table
+  const tableCard = document.createElement('div');
+  tableCard.className = 'card';
+  tableCard.innerHTML = `
+    <div class="card-header">
+      <div><div class="card-title">Data table</div><div class="card-sub">Showing ${Math.min(rows.length, 100)} of ${rows.length} rows</div></div>
+    </div>`;
+  const wrap = document.createElement('div');
+  wrap.className = 'table-wrap';
+  const table = document.createElement('table');
+  table.innerHTML = `<thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>`;
+  const tbody = document.createElement('tbody');
+  rows.slice(0, 100).forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = cols.map(c => {
+      const v = row[c];
+      const isNum = typeof v === 'number';
+      const display = v == null ? '—' : isNum ? fmt(v, v % 1 !== 0 ? 2 : 0) : String(v);
+      return `<td class="${isNum ? 'td-num' : ''}">${display}</td>`;
+    }).join('');
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  tableCard.appendChild(wrap);
+  container.appendChild(tableCard);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+loadAllData();
+</script>
+</body>
+</html>
