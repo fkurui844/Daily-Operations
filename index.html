@@ -8,33 +8,20 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
-    --bg: #f4f1eb;
-    --surface: #ffffff;
-    --border: #e8e3d8;
-    --text: #1a1714;
-    --text-muted: #7a7268;
-    --text-faint: #b0a99e;
-    --green: #2d6a4f;
-    --green-light: #d8f3dc;
-    --amber: #b5460f;
-    --amber-light: #fde8d8;
-    --blue: #1b4f72;
-    --blue-light: #d6eaf8;
-    --teal: #0e6655;
-    --teal-light: #d5f5e3;
-    --radius: 10px;
-    --radius-lg: 16px;
+    --bg: #f4f1eb; --surface: #ffffff; --border: #e8e3d8;
+    --text: #1a1714; --text-muted: #7a7268; --text-faint: #b0a99e;
+    --green: #2d6a4f; --green-light: #d8f3dc;
+    --amber: #b5460f; --amber-light: #fde8d8;
+    --blue: #1b4f72; --blue-light: #d6eaf8;
+    --teal: #0e6655; --teal-light: #d5f5e3;
+    --purple: #6b3fa0; --purple-light: #ede0ff;
+    --coral: #a0402a; --coral-light: #fde0d8;
+    --radius: 10px; --radius-lg: 16px;
   }
-
   body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; line-height: 1.5; }
 
-  .header {
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 0 2rem; position: sticky; top: 0; z-index: 100;
-    display: flex; align-items: center; justify-content: space-between; height: 60px;
-  }
+  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 2rem; position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; height: 60px; }
   .header-brand { display: flex; align-items: center; gap: 10px; }
   .brand-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--green); display: flex; align-items: center; justify-content: center; font-size: 16px; }
   .brand-name { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
@@ -43,38 +30,27 @@
 
   .layout { display: flex; min-height: calc(100vh - 60px); }
 
-  .sidebar {
-    width: 200px; flex-shrink: 0; background: var(--surface);
-    border-right: 1px solid var(--border); padding: 1.25rem 0;
-    position: sticky; top: 60px; height: calc(100vh - 60px); overflow-y: auto;
-  }
+  .sidebar { width: 210px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); padding: 1.25rem 0; position: sticky; top: 60px; height: calc(100vh - 60px); overflow-y: auto; }
   .sidebar-section { padding: 0 1rem; margin-bottom: 1.5rem; }
   .sidebar-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); padding: 0 0.5rem; margin-bottom: 4px; }
-  .nav-item {
-    display: flex; align-items: center; gap: 8px; padding: 7px 10px;
-    border-radius: 8px; cursor: pointer; transition: all 0.15s;
-    font-size: 13px; color: var(--text-muted); border: none; background: none; width: 100%; text-align: left;
-  }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; cursor: pointer; transition: all 0.15s; font-size: 13px; color: var(--text-muted); border: none; background: none; width: 100%; text-align: left; font-family: 'DM Sans', sans-serif; }
   .nav-item:hover { background: var(--bg); color: var(--text); }
   .nav-item.active { background: var(--green-light); color: var(--green); font-weight: 500; }
   .nav-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  #nav-tabs { /* dynamic */ }
 
-  .main { flex: 1; padding: 1.75rem 2rem; overflow-x: hidden; max-width: calc(100vw - 200px); }
+  .main { flex: 1; padding: 1.75rem 2rem; overflow-x: hidden; max-width: calc(100vw - 210px); }
 
   .page-header { margin-bottom: 1.5rem; }
   .page-title { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; }
   .page-subtitle { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
 
-  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 1.75rem; }
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 12px; margin-bottom: 1.75rem; }
   .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.1rem 1.25rem; }
   .metric-label { font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
-  .metric-value { font-size: 26px; font-weight: 600; letter-spacing: -1px; line-height: 1.1; }
-  .metric-unit { font-size: 14px; font-weight: 400; color: var(--text-muted); margin-left: 3px; }
+  .metric-value { font-size: 24px; font-weight: 600; letter-spacing: -0.8px; line-height: 1.1; }
+  .metric-unit { font-size: 13px; font-weight: 400; color: var(--text-muted); margin-left: 3px; }
   .metric-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 20px; margin-top: 6px; }
-  .badge-green { background: var(--green-light); color: var(--green); }
-  .badge-amber { background: var(--amber-light); color: var(--amber); }
-  .badge-blue { background: var(--blue-light); color: var(--blue); }
-  .badge-teal { background: var(--teal-light); color: var(--teal); }
 
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 1rem; }
   .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1rem; }
@@ -91,21 +67,16 @@
   td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
   tr:last-child td { border-bottom: none; }
   tbody tr:hover { background: var(--bg); }
-  .td-num { font-family: 'DM Mono', monospace; font-size: 12px; }
-
-  .dot-green { background: var(--green); }
-  .dot-amber { background: #e67e22; }
-  .dot-blue { background: var(--blue); }
-  .dot-teal { background: var(--teal); }
+  .td-num { font-family: 'DM Mono', monospace; font-size: 12px; text-align: right; }
 
   .state-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 3rem 2rem; text-align: center; }
   .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 1rem; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .state-title { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
-  .state-sub { font-size: 13px; color: var(--text-muted); max-width: 420px; margin: 0 auto; line-height: 1.6; }
+  .state-sub { font-size: 13px; color: var(--text-muted); max-width: 440px; margin: 0 auto; line-height: 1.6; }
   .error-box { border-color: #f5c6c6; background: #fff8f8; }
 
-  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
   .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
   .legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
 
@@ -113,27 +84,22 @@
   .btn:hover { background: var(--bg); }
   .btn-primary { background: var(--green); color: white; border-color: var(--green); }
   .btn-primary:hover { background: #245a41; }
+  .show-more-wrap { text-align: center; padding: 12px 0 4px; }
 
-  @media (max-width: 768px) { .sidebar { display: none; } .main { max-width: 100vw; padding: 1rem; } .header { padding: 0 1rem; } }
-
-  .hidden { display: none !important; }
-  .fade-in { animation: fadeIn 0.3s ease; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-
-  .summary-bar { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1.75rem; background: var(--surface); }
-  .summary-bar-item { padding: 1rem 1.25rem; border-right: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
-  .summary-bar-item:last-child { border-right: none; }
-  .summary-bar-item:hover { background: var(--bg); }
-  .summary-bar-item.active { background: var(--green-light); }
+  .summary-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1.75rem; background: var(--surface); }
+  .sbi { padding: 1rem 1.25rem; border-right: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
+  .sbi:last-child { border-right: none; }
+  .sbi:hover { background: var(--bg); }
+  .sbi.active { background: var(--green-light); }
   .sbi-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin-bottom: 4px; }
-  .sbi-value { font-size: 19px; font-weight: 600; letter-spacing: -0.5px; }
+  .sbi-value { font-size: 18px; font-weight: 600; letter-spacing: -0.5px; word-break: break-all; }
   .sbi-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
 
-  @media (max-width: 600px) {
-    .summary-bar { grid-template-columns: repeat(2, 1fr); }
-    .summary-bar-item:nth-child(2) { border-right: none; }
-    .summary-bar-item:nth-child(1), .summary-bar-item:nth-child(2) { border-bottom: 1px solid var(--border); }
-  }
+  .hidden { display: none !important; }
+  .fade-in { animation: fadeIn 0.25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 768px) { .sidebar { display: none; } .main { max-width: 100vw; padding: 1rem; } .header { padding: 0 1rem; } }
 </style>
 </head>
 <body>
@@ -153,179 +119,100 @@
   <nav class="sidebar">
     <div class="sidebar-section">
       <div class="sidebar-label">Departments</div>
-      <button class="nav-item active" onclick="switchTab('overview')" id="nav-overview">
-        <span class="nav-dot" style="background:#888"></span> Overview
-      </button>
-      <button class="nav-item" onclick="switchTab('Milk Intake')" id="nav-MilkIntake">
-        <span class="nav-dot dot-green"></span> Milk Intake
-      </button>
-      <button class="nav-item" onclick="switchTab('Production')" id="nav-Production">
-        <span class="nav-dot dot-amber"></span> Production
-      </button>
-      <button class="nav-item" onclick="switchTab('Sales')" id="nav-Sales">
-        <span class="nav-dot dot-blue"></span> Sales
-      </button>
-      <button class="nav-item" onclick="switchTab('Finance')" id="nav-Finance">
-        <span class="nav-dot dot-teal"></span> Finance
-      </button>
+      <div id="nav-tabs">
+        <!-- Populated dynamically after sheets load -->
+        <button class="nav-item active" onclick="switchTab('__overview__')" id="nav-__overview__">
+          <span class="nav-dot" style="background:#888"></span> Overview
+        </button>
+      </div>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-label">Actions</div>
       <button class="nav-item" onclick="loadAllData()">↻ Refresh data</button>
     </div>
   </nav>
-
   <main class="main">
     <div id="loading-state" class="state-box">
       <div class="spinner"></div>
       <div class="state-title" id="loading-msg">Connecting to Google Sheets…</div>
-      <div class="state-sub">Fetching Milk Intake, Production, Sales and Finance data.</div>
+      <div class="state-sub" id="loading-sub">Discovering sheet tabs…</div>
     </div>
-
     <div id="error-state" class="state-box error-box hidden">
       <div style="font-size:28px;margin-bottom:10px">⚠️</div>
       <div class="state-title">Could not load data</div>
-      <div class="state-sub" id="error-detail">
-        Make sure the sheet is shared as <strong>"Anyone with the link → Viewer"</strong>
-        and published via File → Share → Publish to web.
-      </div>
-      <br>
-      <button class="btn btn-primary" onclick="loadAllData()">Try again</button>
+      <div class="state-sub" id="error-detail"></div>
+      <br><button class="btn btn-primary" onclick="loadAllData()">Try again</button>
     </div>
-
     <div id="dashboard" class="hidden"></div>
   </main>
 </div>
 
 <script>
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIG — only the spreadsheet ID is fixed. Everything else is discovered.
+// ─────────────────────────────────────────────────────────────────────────────
 const FILE_ID = '13LiH5I_0qdB6REtOx26cOpBBQLhkJceArjNwc1uUPPM';
-const SHEETS  = ['Milk Intake', 'Production', 'Sales', 'Finance'];
 
-const COLORS = {
-  'Milk Intake': '#2d6a4f',
-  'Production':  '#c97b2a',
-  'Sales':       '#1b4f72',
-  'Finance':     '#0e6655'
-};
-const BADGE_CLASS = {
-  'Milk Intake': 'green',
-  'Production':  'amber',
-  'Sales':       'blue',
-  'Finance':     'teal'
-};
-const LINE_PALETTES = {
-  'Milk Intake': ['#2d6a4f','#52b788','#95d5b2','#b7e4c7'],
-  'Production':  ['#c97b2a','#e9a24a','#f4c07a','#fad9a8'],
-  'Sales':       ['#1b4f72','#2980b9','#7fb3d3','#aed6f1'],
-  'Finance':     ['#0e6655','#1abc9c','#76d7c4','#a2d9ce']
-};
+// Colour palette rotated across however many tabs are found
+const TAB_COLORS = [
+  { main: '#2d6a4f', light: '#d8f3dc', badge: 'green' },
+  { main: '#c97b2a', light: '#fde8d8', badge: 'amber' },
+  { main: '#1b4f72', light: '#d6eaf8', badge: 'blue'  },
+  { main: '#0e6655', light: '#d5f5e3', badge: 'teal'  },
+  { main: '#6b3fa0', light: '#ede0ff', badge: 'purple'},
+  { main: '#a0402a', light: '#fde0d8', badge: 'coral' },
+];
+// CSS for badge classes (injected once)
+const BADGE_CSS = `
+  .badge-green  { background:#d8f3dc; color:#2d6a4f; }
+  .badge-amber  { background:#fde8d8; color:#b5460f; }
+  .badge-blue   { background:#d6eaf8; color:#1b4f72; }
+  .badge-teal   { background:#d5f5e3; color:#0e6655; }
+  .badge-purple { background:#ede0ff; color:#6b3fa0; }
+  .badge-coral  { background:#fde0d8; color:#a0402a; }
+`;
+const styleEl = document.createElement('style');
+styleEl.textContent = BADGE_CSS;
+document.head.appendChild(styleEl);
 
-let allData     = {};
-let activeTab   = 'overview';
+// ── State ────────────────────────────────────────────────────────────────────
+let sheetMeta   = [];   // [{ name, color }]  — discovered at runtime
+let allData     = {};   // { sheetName: { cols, rows } }
+let activeTab   = '__overview__';
 let chartInst   = {};
+let tableShown  = {};   // how many rows are shown per tab
 
 // ── Unit detection ───────────────────────────────────────────────────────────
-// Returns a short display unit string based on the column header text.
 function detectUnit(sheetName, colName) {
-  const s = (colName || '').toLowerCase();
+  const s = (colName   || '').toLowerCase();
   const n = (sheetName || '').toLowerCase();
-  // Litre / liters — also flag for Milk Intake sheet as default
   if (/\b(l|ltr|litr|litre|liter|litres|liters|volume)\b/.test(s)) return 'L';
-  if (n === 'milk intake') return 'L';           // whole sheet default
-  // Currency
-  if (/\b(kes|ksh|ksh\.|amount|revenue|cost|expense|income|profit|loss|price|value|sales|payment|cash)\b/.test(s)) return 'KES';
-  // Weight
+  if (n.includes('milk'))  return 'L';
+  if (/\b(kes|ksh|amount|revenue|cost|expense|income|profit|loss|price|value|sales|payment|cash|fee|total)\b/.test(s)) return 'KES';
   if (/\b(kg|kgs|kilogram|weight)\b/.test(s)) return 'kg';
-  // Count / pieces
   if (/\b(qty|quantity|units|pcs|pieces|count|no\.?|number)\b/.test(s)) return 'units';
   return '';
 }
 
-// Format a number with optional unit suffix
-function fmtU(v, unit, dp) {
-  if (v == null || isNaN(v)) return '—';
-  const n = Number(v).toLocaleString('en-KE', { maximumFractionDigits: dp ?? (v > 999 ? 0 : 1), minimumFractionDigits: 0 });
-  return unit ? `${n} ${unit}` : n;
-}
+// ── Formatting ───────────────────────────────────────────────────────────────
 function fmt(v, dp) {
   if (v == null || isNaN(v)) return '—';
   return Number(v).toLocaleString('en-KE', { maximumFractionDigits: dp ?? 0, minimumFractionDigits: 0 });
 }
-
-// ── Fetch one sheet ──────────────────────────────────────────────────────────
-async function fetchSheet(name) {
-  const url = `https://docs.google.com/spreadsheets/d/${FILE_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(name)}`;
-  const res  = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const text  = await res.text();
-  const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
-  if (!match) throw new Error('Unexpected response format');
-  const json  = JSON.parse(match[1]);
-  if (!json.table) throw new Error('No table data');
-  const cols = json.table.cols.map(c => c.label || c.id || '').filter(Boolean);
-  const rows = (json.table.rows || [])
-    .map(r => {
-      const obj = {};
-      if (r && r.c) r.c.forEach((cell, i) => { if (cols[i]) obj[cols[i]] = cell ? cell.v : null; });
-      return obj;
-    })
-    .filter(r => Object.values(r).some(v => v !== null && v !== ''));
-  return { cols, rows };
+function fmtU(v, unit, dp) {
+  if (v == null || isNaN(v)) return '—';
+  const n = Number(v).toLocaleString('en-KE', { maximumFractionDigits: dp ?? (Math.abs(v) > 999 ? 0 : 1), minimumFractionDigits: 0 });
+  return unit ? `${n} ${unit}` : n;
 }
 
-// ── Load all ─────────────────────────────────────────────────────────────────
-async function loadAllData() {
-  document.getElementById('loading-state').classList.remove('hidden');
-  document.getElementById('error-state').classList.add('hidden');
-  document.getElementById('dashboard').classList.add('hidden');
-  allData = {};
-  const errors = [];
-
-  for (const name of SHEETS) {
-    document.getElementById('loading-msg').textContent = `Loading ${name}…`;
-    try { allData[name] = await fetchSheet(name); }
-    catch (e) { errors.push(`${name}: ${e.message}`); }
-  }
-
-  document.getElementById('loading-state').classList.add('hidden');
-
-  if (Object.keys(allData).length === 0) {
-    document.getElementById('error-detail').textContent =
-      'Could not load any sheets. ' + errors.join(' | ');
-    document.getElementById('error-state').classList.remove('hidden');
-    return;
-  }
-
-  const now = new Date();
-  document.getElementById('last-updated').textContent =
-    'Updated ' + now.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
-
-  document.getElementById('dashboard').classList.remove('hidden');
-  renderTab(activeTab);
-}
-
-// ── Tab switching ────────────────────────────────────────────────────────────
-function switchTab(tab) {
-  activeTab = tab;
-  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  const idMap = { overview: 'overview', 'Milk Intake': 'MilkIntake', Production: 'Production', Sales: 'Sales', Finance: 'Finance' };
-  const el = document.getElementById('nav-' + (idMap[tab] || tab));
-  if (el) el.classList.add('active');
-  destroyCharts();
-  const dash = document.getElementById('dashboard');
-  dash.innerHTML = '';
-  if (tab === 'overview') renderOverview(dash);
-  else if (allData[tab]) renderSheet(tab, allData[tab], dash);
-}
-
-function destroyCharts() {
-  Object.values(chartInst).forEach(c => { try { c.destroy(); } catch(e){} });
-  chartInst = {};
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Sheet helpers ─────────────────────────────────────────────────────────────
 function getNumCols(cols, rows) {
   return cols.filter(c => rows.some(r => typeof r[c] === 'number'));
+}
+function getLabelCol(cols, rows) {
+  // Prefer first non-numeric, non-blank column; fallback to cols[0]
+  const numSet = new Set(getNumCols(cols, rows));
+  return cols.find(c => !numSet.has(c)) || cols[0];
 }
 function colSum(rows, col) {
   return rows.reduce((s, r) => s + (typeof r[col] === 'number' ? r[col] : 0), 0);
@@ -334,150 +221,272 @@ function makeCanvas(id, height) {
   const wrap = document.createElement('div');
   wrap.className = 'chart-container';
   wrap.style.height = (height || 240) + 'px';
-  const c = document.createElement('canvas');
-  c.id = id;
+  const c = document.createElement('canvas'); c.id = id;
   wrap.appendChild(c);
   return { wrap, canvas: c };
 }
+function tabColor(name) {
+  const idx = sheetMeta.findIndex(s => s.name === name);
+  return TAB_COLORS[idx >= 0 ? idx % TAB_COLORS.length : 0];
+}
+function tabId(name) { return 'nav-' + name.replace(/\W/g, '_'); }
 
-// ── Overview ─────────────────────────────────────────────────────────────────
+// ── Discover sheet tabs ───────────────────────────────────────────────────────
+// Fetches the spreadsheet HTML page and parses sheet names from it.
+async function discoverSheets() {
+  const url = `https://docs.google.com/spreadsheets/d/${FILE_ID}/pubhtml`;
+  const res  = await fetch(url);
+  if (!res.ok) throw new Error(`Could not reach spreadsheet (HTTP ${res.status})`);
+  const html = await res.text();
+  // Sheet names appear in <li id="sheet-button-..."> or in data-sheet-id spans
+  const names = [];
+  // Try: <li ... id="sheet-button-..."><a ...>Sheet Name</a>
+  const liRe = /<li[^>]*id="sheet-button[^"]*"[^>]*>\s*<a[^>]*>([^<]+)<\/a>/gi;
+  let m;
+  while ((m = liRe.exec(html)) !== null) names.push(m[1].trim());
+  if (names.length) return names;
+  // Fallback: look for data-sheet-index spans used in newer pubhtml
+  const spanRe = /<span[^>]*class="[^"]*goog-inline-block[^"]*"[^>]*>([^<]+)<\/span>/gi;
+  const candidates = [];
+  while ((m = spanRe.exec(html)) !== null) {
+    const t = m[1].trim();
+    if (t && !t.startsWith('<') && t.length < 60) candidates.push(t);
+  }
+  // De-duplicate while preserving order
+  const seen = new Set();
+  for (const c of candidates) { if (!seen.has(c)) { seen.add(c); names.push(c); } }
+  return names;
+}
+
+// ── Fetch one sheet's data ────────────────────────────────────────────────────
+async function fetchSheet(name) {
+  const url = `https://docs.google.com/spreadsheets/d/${FILE_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(name)}`;
+  const res  = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const text  = await res.text();
+  const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
+  if (!match) throw new Error('Unexpected response format');
+  const json  = JSON.parse(match[1]);
+  if (!json.table) throw new Error('Empty table');
+  // Read column headers exactly as they appear in the sheet
+  const cols = json.table.cols.map(c => (c.label || c.id || '').trim()).filter(Boolean);
+  const rows = (json.table.rows || [])
+    .map(r => {
+      const obj = {};
+      if (r && r.c) r.c.forEach((cell, i) => {
+        if (cols[i] !== undefined) obj[cols[i]] = cell ? cell.v : null;
+      });
+      return obj;
+    })
+    .filter(r => Object.values(r).some(v => v !== null && v !== ''));
+  return { cols, rows };
+}
+
+// ── Load everything ───────────────────────────────────────────────────────────
+async function loadAllData() {
+  // Reset UI
+  document.getElementById('loading-state').classList.remove('hidden');
+  document.getElementById('error-state').classList.add('hidden');
+  document.getElementById('dashboard').classList.add('hidden');
+  allData   = {};
+  sheetMeta = [];
+  tableShown = {};
+
+  const setMsg = (msg, sub) => {
+    document.getElementById('loading-msg').textContent = msg;
+    if (sub) document.getElementById('loading-sub').textContent = sub;
+  };
+
+  try {
+    // 1. Discover sheet tab names
+    setMsg('Discovering sheet tabs…', 'Reading spreadsheet structure');
+    let tabNames = [];
+    try { tabNames = await discoverSheets(); } catch(e) { /* fallback below */ }
+
+    // Fallback: if discovery failed or returned nothing, try known department names
+    if (!tabNames.length) {
+      tabNames = ['Milk Intake', 'Production', 'Sales', 'Finance'];
+    }
+
+    // 2. Fetch each tab's data
+    const errors = [];
+    for (let i = 0; i < tabNames.length; i++) {
+      const name = tabNames[i];
+      setMsg(`Loading "${name}"…`, `Tab ${i + 1} of ${tabNames.length}`);
+      try {
+        const data = await fetchSheet(name);
+        if (data.cols.length && data.rows.length) {
+          allData[name] = data;
+          sheetMeta.push({ name, color: TAB_COLORS[sheetMeta.length % TAB_COLORS.length] });
+        }
+      } catch(e) { errors.push(`${name}: ${e.message}`); }
+    }
+
+    if (!sheetMeta.length) throw new Error('No sheet data loaded. ' + errors.join(' | '));
+
+    // 3. Build sidebar nav dynamically
+    buildNav();
+
+    // 4. Render
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('dashboard').classList.remove('hidden');
+    document.getElementById('last-updated').textContent =
+      'Updated ' + new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+
+    activeTab = '__overview__';
+    renderTab('__overview__');
+
+  } catch (err) {
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('error-detail').innerHTML =
+      err.message + '<br><br>Make sure the sheet is set to <strong>"Anyone with the link → Viewer"</strong> and published via <em>File → Share → Publish to web</em>.';
+    document.getElementById('error-state').classList.remove('hidden');
+  }
+}
+
+// ── Build sidebar nav from discovered sheets ──────────────────────────────────
+function buildNav() {
+  const container = document.getElementById('nav-tabs');
+  container.innerHTML = `
+    <button class="nav-item active" onclick="switchTab('__overview__')" id="nav-__overview__">
+      <span class="nav-dot" style="background:#888"></span> Overview
+    </button>`;
+  sheetMeta.forEach(({ name, color }) => {
+    const btn = document.createElement('button');
+    btn.className = 'nav-item';
+    btn.id = tabId(name);
+    btn.onclick = () => switchTab(name);
+    btn.innerHTML = `<span class="nav-dot" style="background:${color.main}"></span> ${name}`;
+    container.appendChild(btn);
+  });
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById(tab === '__overview__' ? 'nav-__overview__' : tabId(tab));
+  if (el) el.classList.add('active');
+  destroyCharts();
+  const dash = document.getElementById('dashboard');
+  dash.innerHTML = '';
+  tab === '__overview__' ? renderOverview(dash) : renderSheet(tab, allData[tab], dash);
+}
+
+function destroyCharts() {
+  Object.values(chartInst).forEach(c => { try { c.destroy(); } catch(e){} });
+  chartInst = {};
+}
+
+// ── Overview ──────────────────────────────────────────────────────────────────
 function renderOverview(container) {
   container.classList.add('fade-in');
   container.innerHTML = `
     <div class="page-header">
       <div class="page-title">Operations Overview</div>
-      <div class="page-subtitle">Cross-department summary — live data from Google Sheets</div>
+      <div class="page-subtitle">All departments · live data · ${sheetMeta.length} sheet${sheetMeta.length !== 1 ? 's' : ''} loaded</div>
     </div>`;
 
-  // Summary bar — titles and units come from sheet data
-  const summaryBar = document.createElement('div');
-  summaryBar.className = 'summary-bar';
-
-  SHEETS.forEach(name => {
+  // Summary bar — one cell per discovered sheet
+  const bar = document.createElement('div');
+  bar.className = 'summary-bar';
+  sheetMeta.forEach(({ name, color }) => {
     const sheet = allData[name];
-    let totalDisplay = '—', subText = '0 records';
-    if (sheet) {
-      const nums = getNumCols(sheet.cols, sheet.rows);
-      const primaryCol = nums[0] || null;
-      const unit = primaryCol ? detectUnit(name, primaryCol) : (name === 'Milk Intake' ? 'L' : '');
-      const total = primaryCol ? colSum(sheet.rows, primaryCol) : 0;
-      totalDisplay = fmtU(total, unit);
-      // sub: use the primary column name as context label
-      const colLabel = primaryCol || '';
-      subText = `${sheet.rows.length} records${colLabel ? ' · ' + colLabel : ''}`;
-    }
-    const item = document.createElement('div');
-    item.className = 'summary-bar-item';
-    item.onclick = () => switchTab(name);
-    item.innerHTML = `
+    const nums  = getNumCols(sheet.cols, sheet.rows);
+    const primaryCol = nums[0] || null;
+    const unit  = primaryCol ? detectUnit(name, primaryCol) : '';
+    const total = primaryCol ? colSum(sheet.rows, primaryCol) : 0;
+    const sub   = `${sheet.rows.length} rows${primaryCol ? ' · ' + primaryCol : ''}`;
+    const cell  = document.createElement('div');
+    cell.className = 'sbi';
+    cell.onclick   = () => switchTab(name);
+    cell.innerHTML = `
       <div class="sbi-label">${name}</div>
-      <div class="sbi-value">${totalDisplay}</div>
-      <div class="sbi-sub">${subText}</div>`;
-    summaryBar.appendChild(item);
+      <div class="sbi-value">${fmtU(total, unit)}</div>
+      <div class="sbi-sub">${sub}</div>`;
+    bar.appendChild(cell);
   });
-  container.appendChild(summaryBar);
+  container.appendChild(bar);
 
-  // Mini charts
-  const chartsRow = document.createElement('div');
-  chartsRow.className = 'charts-row';
-
-  SHEETS.forEach(name => {
+  // Mini trend card per sheet
+  const grid = document.createElement('div');
+  grid.className = 'charts-row';
+  sheetMeta.forEach(({ name, color }) => {
     const sheet = allData[name];
-    if (!sheet) return;
-    const nums = getNumCols(sheet.cols, sheet.rows);
+    const nums  = getNumCols(sheet.cols, sheet.rows);
     if (!nums.length || sheet.rows.length < 2) return;
-
-    const labelCol  = sheet.cols[0];
+    const labelCol  = getLabelCol(sheet.cols, sheet.rows);
     const valueCol  = nums[0];
     const unit      = detectUnit(name, valueCol);
-    const color     = COLORS[name];
-    const badge     = BADGE_CLASS[name];
-    const sliced    = sheet.rows.slice(0, 14);
+    const sliced    = sheet.rows.slice(0, 16);
     const total     = colSum(sheet.rows, valueCol);
-
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `
       <div class="card-header">
         <div>
           <div class="card-title">${name}</div>
-          <div class="card-sub">${valueCol}${unit ? ' (' + unit + ')' : ''} · ${sheet.rows.length} records</div>
+          <div class="card-sub">${valueCol}${unit ? ' (' + unit + ')' : ''} · ${sheet.rows.length} rows · ${nums.length} numeric col${nums.length !== 1 ? 's' : ''}</div>
         </div>
-        <span class="metric-badge badge-${badge}">${fmtU(total, unit)}</span>
+        <span class="metric-badge badge-${color.badge}">${fmtU(total, unit)}</span>
       </div>`;
-
-    const chartId = 'ov-' + name.replace(/\s/g, '');
-    const { wrap, canvas } = makeCanvas(chartId, 180);
+    const cid = 'ov_' + name.replace(/\W/g, '');
+    const { wrap, canvas } = makeCanvas(cid, 180);
     card.appendChild(wrap);
-    chartsRow.appendChild(card);
-
+    grid.appendChild(card);
     setTimeout(() => {
-      chartInst[chartId] = new Chart(canvas, {
+      chartInst[cid] = new Chart(canvas, {
         type: 'line',
         data: {
           labels: sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : ''),
-          datasets: [{
-            data: sliced.map(r => typeof r[valueCol] === 'number' ? r[valueCol] : 0),
-            borderColor: color,
-            backgroundColor: color + '18',
-            borderWidth: 2,
-            fill: true,
-            tension: 0.4,
-            pointRadius: 2,
-            pointHoverRadius: 5
-          }]
+          datasets: [{ data: sliced.map(r => typeof r[valueCol] === 'number' ? r[valueCol] : 0), borderColor: color.main, backgroundColor: color.main + '18', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 2, pointHoverRadius: 5 }]
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false },
-            tooltip: { callbacks: { label: ctx => ' ' + fmtU(ctx.parsed.y, unit) } }
-          },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + fmtU(ctx.parsed.y, unit) } } },
           scales: {
-            x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 6 } },
+            x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 7 } },
             y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) + (unit ? ' ' + unit : '') } }
           }
         }
       });
     }, 50);
   });
-
-  container.appendChild(chartsRow);
+  container.appendChild(grid);
 }
 
-// ── Single sheet ─────────────────────────────────────────────────────────────
+// ── Single sheet ──────────────────────────────────────────────────────────────
 function renderSheet(name, sheet, container) {
   container.classList.add('fade-in');
   const { cols, rows } = sheet;
-  const nums     = getNumCols(cols, rows);
-  const labelCol = cols[0];
-  const color    = COLORS[name];
-  const badge    = BADGE_CLASS[name];
-  const palette  = LINE_PALETTES[name];
+  const color     = tabColor(name);
+  const nums      = getNumCols(cols, rows);
+  const labelCol  = getLabelCol(cols, rows);
 
-  // Page header — use actual sheet name as title
+  // Page header — title = exact sheet tab name; subtitle = exact column names
   const hdr = document.createElement('div');
   hdr.className = 'page-header';
   hdr.innerHTML = `
     <div class="page-title">${name}</div>
-    <div class="page-subtitle">${rows.length} records · columns: ${cols.join(', ')}</div>`;
+    <div class="page-subtitle">${rows.length} rows · ${cols.length} columns: ${cols.join(', ')}</div>`;
   container.appendChild(hdr);
 
-  // Metric cards — label and unit straight from column headers
+  // Metric cards — one per numeric column, label = exact column header
   if (nums.length) {
     const grid = document.createElement('div');
     grid.className = 'metrics-grid';
-    nums.slice(0, 6).forEach(col => {
-      const unit  = detectUnit(name, col);
-      const total = colSum(rows, col);
-      const validRows = rows.filter(r => typeof r[col] === 'number').length;
-      const avg   = validRows ? total / validRows : 0;
-      const dp    = total > 1000 ? 0 : 1;
-      const card  = document.createElement('div');
+    nums.forEach(col => {
+      const unit   = detectUnit(name, col);
+      const total  = colSum(rows, col);
+      const valid  = rows.filter(r => typeof r[col] === 'number');
+      const avg    = valid.length ? total / valid.length : 0;
+      const dp     = total > 999 ? 0 : 1;
+      const card   = document.createElement('div');
       card.className = 'metric-card';
       card.innerHTML = `
         <div class="metric-label">${col}</div>
         <div class="metric-value">${fmt(total, dp)}<span class="metric-unit">${unit}</span></div>
-        <div class="metric-badge badge-${badge}">avg ${fmtU(avg, unit, avg > 100 ? 0 : 1)}</div>`;
+        <div class="metric-badge badge-${color.badge}">avg ${fmtU(avg, unit, avg > 100 ? 0 : 1)}</div>`;
       grid.appendChild(card);
     });
     container.appendChild(grid);
@@ -487,11 +496,11 @@ function renderSheet(name, sheet, container) {
   if (nums.length && rows.length > 1) {
     const chartsRow = document.createElement('div');
     chartsRow.className = 'charts-row';
-    const maxShow = 20;
-    const sliced  = rows.slice(0, maxShow);
+    const MAX_CHART_ROWS = 30;
+    const sliced = rows.slice(0, MAX_CHART_ROWS);
 
-    // Bar chart — primary column, uses its real header as axis label
-    const primaryCol = nums[0];
+    // Bar — primary numeric column (first found); label = exact column name
+    const primaryCol  = nums[0];
     const primaryUnit = detectUnit(name, primaryCol);
     const barCard = document.createElement('div');
     barCard.className = 'card';
@@ -499,104 +508,66 @@ function renderSheet(name, sheet, container) {
       <div class="card-header">
         <div>
           <div class="card-title">${primaryCol}${primaryUnit ? ' (' + primaryUnit + ')' : ''}</div>
-          <div class="card-sub">by ${labelCol} · showing first ${Math.min(rows.length, maxShow)}</div>
+          <div class="card-sub">by ${labelCol}${rows.length > MAX_CHART_ROWS ? ' · first ' + MAX_CHART_ROWS + ' rows' : ''}</div>
         </div>
       </div>`;
-    const barId = name.replace(/\s/g, '') + '-bar';
-    const { wrap: barWrap, canvas: barCanvas } = makeCanvas(barId, 260);
-    barCard.appendChild(barWrap);
+    const barId = name.replace(/\W/g,'') + '_bar';
+    const { wrap: bw, canvas: bc } = makeCanvas(barId, 260);
+    barCard.appendChild(bw);
     chartsRow.appendChild(barCard);
-
     setTimeout(() => {
-      chartInst[barId] = new Chart(barCanvas, {
+      chartInst[barId] = new Chart(bc, {
         type: 'bar',
         data: {
-          labels: sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 12) : ''),
-          datasets: [{
-            label: primaryCol,
-            data: sliced.map(r => typeof r[primaryCol] === 'number' ? r[primaryCol] : 0),
-            backgroundColor: color + 'cc',
-            borderColor: color,
-            borderWidth: 1,
-            borderRadius: 4
-          }]
+          labels: sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 14) : ''),
+          datasets: [{ label: primaryCol, data: sliced.map(r => typeof r[primaryCol] === 'number' ? r[primaryCol] : 0), backgroundColor: color.main + 'cc', borderColor: color.main, borderWidth: 1, borderRadius: 4 }]
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: { callbacks: { label: ctx => ` ${primaryCol}: ${fmtU(ctx.parsed.y, primaryUnit)}` } }
-          },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${primaryCol}: ${fmtU(ctx.parsed.y, primaryUnit)}` } } },
           scales: {
-            x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: rows.length > 12 } },
+            x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: rows.length > 14 } },
             y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) + (primaryUnit ? ' ' + primaryUnit : '') } }
           }
         }
       });
     }, 50);
 
-    // Multi-series line (when multiple numeric cols)
+    // Multi-series line — ALL numeric columns, each labelled with exact column name
     if (nums.length > 1) {
-      const seriesCols = nums.slice(0, 4);
       const lineCard = document.createElement('div');
       lineCard.className = 'card';
-
-      // Legend uses actual column names
+      // Build a colour palette sized to the number of numeric columns
+      const palette = nums.map((_, i) => {
+        const hues = [color.main, '#52b788','#95d5b2','#74b9e0','#f4a261','#e76f51','#a8dadc','#457b9d'];
+        return hues[i % hues.length];
+      });
+      // Legend uses exact column names
       const legendEl = document.createElement('div');
       legendEl.className = 'legend';
-      seriesCols.forEach((col, i) => {
+      nums.forEach((col, i) => {
         const u = detectUnit(name, col);
-        legendEl.innerHTML += `
-          <div class="legend-item">
-            <div class="legend-swatch" style="background:${palette[i % palette.length]}"></div>
-            ${col}${u ? ' (' + u + ')' : ''}
-          </div>`;
+        legendEl.innerHTML += `<div class="legend-item"><div class="legend-swatch" style="background:${palette[i]}"></div>${col}${u ? ' (' + u + ')' : ''}</div>`;
       });
-
-      lineCard.innerHTML = `
-        <div class="card-header">
-          <div><div class="card-title">Trend — all metrics</div></div>
-        </div>`;
+      lineCard.innerHTML = `<div class="card-header"><div><div class="card-title">All metrics — trend</div><div class="card-sub">${nums.length} columns</div></div></div>`;
       lineCard.appendChild(legendEl);
-
-      const lineId = name.replace(/\s/g, '') + '-line';
-      const { wrap: lineWrap, canvas: lineCanvas } = makeCanvas(lineId, 260);
-      lineCard.appendChild(lineWrap);
+      const lineId = name.replace(/\W/g,'') + '_line';
+      const { wrap: lw, canvas: lc } = makeCanvas(lineId, 260);
+      lineCard.appendChild(lw);
       chartsRow.appendChild(lineCard);
-
       setTimeout(() => {
-        chartInst[lineId] = new Chart(lineCanvas, {
+        chartInst[lineId] = new Chart(lc, {
           type: 'line',
           data: {
             labels: sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : ''),
-            datasets: seriesCols.map((col, i) => {
+            datasets: nums.map((col, i) => {
               const u = detectUnit(name, col);
-              return {
-                label: col + (u ? ' (' + u + ')' : ''),
-                data: sliced.map(r => typeof r[col] === 'number' ? r[col] : 0),
-                borderColor: palette[i % palette.length],
-                backgroundColor: 'transparent',
-                borderWidth: 2,
-                tension: 0.3,
-                pointRadius: 3,
-                borderDash: i % 2 === 1 ? [4, 3] : []
-              };
+              return { label: col + (u ? ' (' + u + ')' : ''), data: sliced.map(r => typeof r[col] === 'number' ? r[col] : 0), borderColor: palette[i], backgroundColor: 'transparent', borderWidth: 2, tension: 0.3, pointRadius: 3, borderDash: i % 2 === 1 ? [4,3] : [] };
             })
           },
           options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                callbacks: {
-                  label: ctx => {
-                    const col = seriesCols[ctx.datasetIndex];
-                    const u   = detectUnit(name, col);
-                    return ` ${col}: ${fmtU(ctx.parsed.y, u)}`;
-                  }
-                }
-              }
-            },
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => { const col = nums[ctx.datasetIndex]; return ` ${col}: ${fmtU(ctx.parsed.y, detectUnit(name, col))}`; } } } },
             scales: {
               x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 8 } },
               y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) } }
@@ -605,50 +576,76 @@ function renderSheet(name, sheet, container) {
         });
       }, 80);
     }
-
     container.appendChild(chartsRow);
   }
 
-  // Data table — headers directly from sheet column names
-  const tableCard = document.createElement('div');
-  tableCard.className = 'card';
-  tableCard.innerHTML = `
-    <div class="card-header">
-      <div>
-        <div class="card-title">Data table — ${name}</div>
-        <div class="card-sub">Showing ${Math.min(rows.length, 100)} of ${rows.length} rows</div>
-      </div>
-    </div>`;
+  // Data table — headers = exact column names from sheet; all rows with pagination
+  const PAGE = 50;
+  if (!tableShown[name]) tableShown[name] = PAGE;
 
-  const wrap  = document.createElement('div');
-  wrap.className = 'table-wrap';
-  const table = document.createElement('table');
+  function buildTable(shown) {
+    const tableCard = document.createElement('div');
+    tableCard.className = 'card';
+    tableCard.id = 'table-card-' + name.replace(/\W/g,'');
+    tableCard.innerHTML = `
+      <div class="card-header">
+        <div>
+          <div class="card-title">Data — ${name}</div>
+          <div class="card-sub">Showing ${Math.min(shown, rows.length)} of ${rows.length} rows · ${cols.length} columns</div>
+        </div>
+      </div>`;
+    const wrap  = document.createElement('div'); wrap.className = 'table-wrap';
+    const table = document.createElement('table');
+    // TH = exact column header; append detected unit in parentheses
+    table.innerHTML = `<thead><tr>${cols.map(c => {
+      const u = detectUnit(name, c);
+      return `<th>${c}${u ? ' (' + u + ')' : ''}</th>`;
+    }).join('')}</tr></thead>`;
+    const tbody = document.createElement('tbody');
+    rows.slice(0, shown).forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = cols.map(c => {
+        const v   = row[c];
+        const isN = typeof v === 'number';
+        const u   = isN ? detectUnit(name, c) : '';
+        const d   = v == null ? '—' : isN ? fmtU(v, u, v % 1 !== 0 ? 2 : 0) : String(v);
+        return `<td class="${isN ? 'td-num' : ''}">${d}</td>`;
+      }).join('');
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    tableCard.appendChild(wrap);
+    // Show more / show all buttons
+    if (shown < rows.length) {
+      const btnWrap = document.createElement('div');
+      btnWrap.className = 'show-more-wrap';
+      btnWrap.innerHTML = `
+        <button class="btn" onclick="showMoreRows('${name}',${shown + PAGE})">Show ${Math.min(PAGE, rows.length - shown)} more rows</button>
+        &nbsp;
+        <button class="btn" onclick="showMoreRows('${name}',${rows.length})">Show all ${rows.length} rows</button>`;
+      tableCard.appendChild(btnWrap);
+    }
+    return tableCard;
+  }
 
-  // TH text = exact column header from sheet; append unit if detected
-  table.innerHTML = `<thead><tr>${cols.map(c => {
-    const u = detectUnit(name, c);
-    return `<th>${c}${u ? ' (' + u + ')' : ''}</th>`;
-  }).join('')}</tr></thead>`;
-
-  const tbody = document.createElement('tbody');
-  rows.slice(0, 100).forEach(row => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = cols.map(c => {
-      const v    = row[c];
-      const isN  = typeof v === 'number';
-      const unit = isN ? detectUnit(name, c) : '';
-      const disp = v == null ? '—' : isN ? fmtU(v, unit, v % 1 !== 0 ? 2 : 0) : String(v);
-      return `<td class="${isN ? 'td-num' : ''}">${disp}</td>`;
-    }).join('');
-    tbody.appendChild(tr);
-  });
-  table.appendChild(tbody);
-  wrap.appendChild(table);
-  tableCard.appendChild(wrap);
-  container.appendChild(tableCard);
+  container.appendChild(buildTable(tableShown[name]));
+  container._buildTable = buildTable; // store ref for show-more
 }
 
-// ── Init ─────────────────────────────────────────────────────────────────────
+// Called by "Show more" buttons
+function showMoreRows(sheetName, newCount) {
+  tableShown[sheetName] = newCount;
+  const cardId = 'table-card-' + sheetName.replace(/\W/g,'');
+  const old    = document.getElementById(cardId);
+  if (old) {
+    const parent = old.parentElement;
+    const built  = parent._buildTable ? parent._buildTable(newCount) : null;
+    if (built) { parent.replaceChild(built, old); }
+  }
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
 loadAllData();
 </script>
 </body>
