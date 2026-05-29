@@ -86,6 +86,17 @@
   .btn:hover { background: var(--bg); }
   .btn-primary { background: var(--green); color: white; border-color: var(--green); }
   .btn-primary:hover { background: #245a41; }
+
+  /* ── Export button & dropdown ───────────────────────────────────────────── */
+  .export-wrap { position: relative; display: inline-flex; }
+  .export-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 13px; border-radius: 8px; font-size: 13px; font-weight: 500; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
+  .export-btn:hover { background: var(--bg); }
+  .export-dropdown { display: none; position: absolute; top: calc(100% + 5px); right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,0.11); z-index: 300; min-width: 190px; padding: 5px; }
+  .export-dropdown.open { display: block; }
+  .export-opt { display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 12px; border-radius: 7px; font-size: 13px; font-weight: 500; border: none; background: none; color: var(--text); cursor: pointer; text-align: left; font-family: 'DM Sans', sans-serif; transition: background 0.12s; }
+  .export-opt:hover { background: var(--bg); }
+  .export-opt-icon { font-size: 15px; flex-shrink: 0; }
+  .export-opt-sub { font-size: 11px; color: var(--text-muted); font-weight: 400; display: block; }
   .show-more-wrap { text-align: center; padding: 12px 0 4px; }
 
   .summary-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1.75rem; background: var(--surface); }
@@ -563,7 +574,26 @@ function buildFilterBar(container) {
       <button class="filter-apply" onclick="applyCustomFilter()">Apply</button>
       ${dateFilter.preset !== 'all' ? `<button class="filter-clear" onclick="clearFilter()">&#10005; Clear</button>` : ''}
     </div>
-    <span class="filter-status ${desc ? '' : 'off'}">${desc ? 'Filtered: ' + desc : 'Showing all data'}</span>`;
+    <span class="filter-status ${desc ? '' : 'off'}">${desc ? 'Filtered: ' + desc : 'Showing all data'}</span>
+    <div class="export-wrap" id="export-wrap">
+      <button class="export-btn" onclick="toggleExportMenu(event)" title="Export data">
+        &#8681; Export
+      </button>
+      <div class="export-dropdown" id="export-dropdown">
+        <button class="export-opt" onclick="exportCurrentCSV()">
+          <span class="export-opt-icon">&#128196;</span>
+          <span>Download CSV<span class="export-opt-sub">Current view (filtered rows)</span></span>
+        </button>
+        <button class="export-opt" onclick="exportAllCSV()">
+          <span class="export-opt-icon">&#128190;</span>
+          <span>Download All Data CSV<span class="export-opt-sub">All rows, no filter applied</span></span>
+        </button>
+        <button class="export-opt" onclick="copyTableToClipboard()">
+          <span class="export-opt-icon">&#128203;</span>
+          <span>Copy to Clipboard<span class="export-opt-sub">Tab-separated, paste into Excel</span></span>
+        </button>
+      </div>
+    </div>`;
 
   container.appendChild(bar);
 }
@@ -2782,6 +2812,121 @@ function showMoreRows(sheetName, newCount) {
     const built  = parent._buildTable ? parent._buildTable(newCount) : null;
     if (built) { parent.replaceChild(built, old); }
   }
+}
+
+// ── Export functions ──────────────────────────────────────────────────────────
+function toggleExportMenu(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('export-dropdown');
+  if (dd) dd.classList.toggle('open');
+}
+// Close export menu on outside click
+document.addEventListener('click', () => {
+  const dd = document.getElementById('export-dropdown');
+  if (dd) dd.classList.remove('open');
+});
+
+// Build CSV string from cols + rows
+function buildCSV(cols, rows) {
+  const escape = v => {
+    if (v == null) return '';
+    const s = String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? '"' + s.replace(/"/g, '""') + '"'
+      : s;
+  };
+  const header = cols.map(escape).join(',');
+  const body   = rows.map(r => cols.map(c => {
+    const v = r[c];
+    // Format dates nicely
+    const d = parseRowDate(v);
+    if (d && (v instanceof Date || (typeof v === 'string' && /^Date\(/.test(v)))) {
+      return escape(d.toLocaleDateString('en-KE'));
+    }
+    return escape(v);
+  }).join(',')).join('\n');
+  return header + '\n' + body;
+}
+
+function downloadCSV(csv, filename) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  document.getElementById('export-dropdown')?.classList.remove('open');
+}
+
+// Export current view — respects active tab + date filter
+function exportCurrentCSV() {
+  const filterDesc = filterDescription();
+  const safeName   = n => n.replace(/[^a-z0-9]/gi, '_');
+  if (activeTab === '__overview__') {
+    // Export all sheets combined as separate blocks
+    const parts = [];
+    sheetMeta.forEach(({ name }) => {
+      const { cols, rows: rawRows } = allData[name];
+      const dateCol = getDateCol(cols, rawRows);
+      const rows    = applyDateFilter(rawRows, dateCol);
+      if (!rows.length) return;
+      parts.push('--- ' + name + ' ---');
+      parts.push(buildCSV(cols, rows));
+    });
+    const suffix = filterDesc ? '_' + filterDesc.replace(/[^a-z0-9]/gi, '_') : '';
+    downloadCSV(parts.join('\n\n'), 'departmental_overview' + suffix + '.csv');
+  } else {
+    const { cols, rows: rawRows } = allData[activeTab] || { cols: [], rows: [] };
+    const dateCol = getDateCol(cols, rawRows);
+    const rows    = applyDateFilter(rawRows, dateCol);
+    const suffix  = filterDesc ? '_' + filterDesc.replace(/[^a-z0-9]/gi, '_') : '';
+    downloadCSV(buildCSV(cols, rows), safeName(activeTab) + suffix + '.csv');
+  }
+}
+
+// Export all data for current tab (no filter)
+function exportAllCSV() {
+  const safeName = n => n.replace(/[^a-z0-9]/gi, '_');
+  if (activeTab === '__overview__') {
+    const parts = [];
+    sheetMeta.forEach(({ name }) => {
+      const { cols, rows } = allData[name];
+      parts.push('--- ' + name + ' ---');
+      parts.push(buildCSV(cols, rows));
+    });
+    downloadCSV(parts.join('\n\n'), 'departmental_all_data.csv');
+  } else {
+    const { cols, rows } = allData[activeTab] || { cols: [], rows: [] };
+    downloadCSV(buildCSV(cols, rows), safeName(activeTab) + '_all_data.csv');
+  }
+}
+
+// Copy current view as tab-separated (Excel-friendly)
+function copyTableToClipboard() {
+  const filterDesc = filterDescription();
+  let text = '';
+  if (activeTab === '__overview__') {
+    sheetMeta.forEach(({ name }) => {
+      const { cols, rows: rawRows } = allData[name];
+      const dateCol = getDateCol(cols, rawRows);
+      const rows    = applyDateFilter(rawRows, dateCol);
+      if (!rows.length) return;
+      text += name + '\n';
+      text += cols.join('\t') + '\n';
+      text += rows.map(r => cols.map(c => r[c] ?? '').join('\t')).join('\n') + '\n\n';
+    });
+  } else {
+    const { cols, rows: rawRows } = allData[activeTab] || { cols: [], rows: [] };
+    const dateCol = getDateCol(cols, rawRows);
+    const rows    = applyDateFilter(rawRows, dateCol);
+    text = cols.join('\t') + '\n';
+    text += rows.map(r => cols.map(c => r[c] ?? '').join('\t')).join('\n');
+  }
+  navigator.clipboard.writeText(text).then(() => {
+    // Brief toast
+    const btn = document.querySelector('.export-btn');
+    if (btn) { const orig = btn.innerHTML; btn.innerHTML = '✓ Copied!'; setTimeout(() => { btn.innerHTML = orig; }, 1800); }
+    document.getElementById('export-dropdown')?.classList.remove('open');
+  }).catch(() => alert('Copy failed — please use Download CSV instead.'));
 }
 
 // ── Mobile sidebar toggle ──────────────────────────────────────────────────────
