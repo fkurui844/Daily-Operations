@@ -847,12 +847,21 @@ function applyProductionCalculations(cols, rows) {
   return computed;
 }
 
-// Detect if a sheet is a production/milk balance sheet
+// Detect if a sheet is a production/milk balance sheet (has B/F and C/F columns)
+// NOTE: "Milk Intake" sheets are NOT production balance sheets — they track raw intake per station.
+// Only flag a sheet as production if it actually has B/F and C/F columns present.
 function isProductionSheet(name, cols) {
   const n = (name || '').toLowerCase();
-  if (n.includes('prod') || n.includes('milk') || n.includes('dairy') || n.includes('balance')) return true;
+  // Milk Intake sheets are explicitly excluded — they use a different per-station renderer
+  if (n.includes('intake') || n.includes('milk intake')) return false;
   const colStr = cols.join(' ').toLowerCase();
-  return /\bb\/?f\b/.test(colStr) && /\bc\/?f\b/.test(colStr);
+  const hasBF = /\bb\/?f\b/.test(colStr) || /brought.forward/.test(colStr) || /opening.stock/.test(colStr);
+  const hasCF = /\bc\/?f\b/.test(colStr) || /carried.forward/.test(colStr) || /closing.stock/.test(colStr);
+  // Must have actual B/F and C/F columns to be treated as a production balance sheet
+  if (hasBF && hasCF) return true;
+  // Also match by name only if it's a production sheet (not generic milk/dairy)
+  if ((n.includes('prod') || n.includes('balance')) && hasBF) return true;
+  return false;
 }
 
 // ── Sheet helpers ─────────────────────────────────────────────────────────────
