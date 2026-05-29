@@ -404,16 +404,357 @@ function destroyCharts() {
   chartInst = {};
 }
 
+// ── Overview helpers ──────────────────────────────────────────────────────────
+function getDateCol(cols, rows) {
+  // Find a column that looks like a date column
+  const dateLike = cols.find(c => {
+    const s = c.toLowerCase();
+    return /\b(date|day|period|week|month)\b/.test(s);
+  });
+  if (dateLike) return dateLike;
+  // Fallback: first column where values look like dates (JS Date objects or parseable strings)
+  return cols.find(c => rows.some(r => {
+    const v = r[c];
+    if (v instanceof Date) return true;
+    if (typeof v === 'string') { const d = new Date(v); return !isNaN(d.getTime()); }
+    return false;
+  })) || null;
+}
+
+function parseRowDate(v) {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  if (typeof v === 'string') { const d = new Date(v); return isNaN(d.getTime()) ? null : d; }
+  if (typeof v === 'number') { const d = new Date(v); return isNaN(d.getTime()) ? null : d; }
+  return null;
+}
+
+function getLatestRows(rows, dateCol) {
+  if (!dateCol) return { today: rows.slice(-1), prev: rows.slice(-2, -1), label: 'Latest entry', prevLabel: 'Previous entry' };
+  const dated = rows.map(r => ({ row: r, d: parseRowDate(r[dateCol]) })).filter(x => x.d);
+  if (!dated.length) return { today: rows.slice(-1), prev: rows.slice(-2, -1), label: 'Latest entry', prevLabel: 'Previous entry' };
+  dated.sort((a, b) => b.d - a.d);
+  const latestDate = dated[0].d;
+  const latestDay  = latestDate.toDateString();
+  const todayRows  = dated.filter(x => x.d.toDateString() === latestDay).map(x => x.row);
+  // Previous day
+  const prevDated  = dated.filter(x => x.d.toDateString() !== latestDay);
+  const prevDay    = prevDated.length ? prevDated[0].d.toDateString() : null;
+  const prevRows   = prevDay ? prevDated.filter(x => x.d.toDateString() === prevDay).map(x => x.row) : [];
+  const fmtDay = d => d ? new Date(d).toLocaleDateString('en-KE', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
+  return { today: todayRows, prev: prevRows, label: fmtDay(latestDate), prevLabel: fmtDay(prevDay ? new Date(prevDay) : null) };
+}
+
+function pct(a, b) { if (!b) return null; return ((a - b) / Math.abs(b)) * 100; }
+
+function trendArrow(p) {
+  if (p === null) return { icon: '—', cls: 'trend-flat', text: 'n/a' };
+  if (p > 5)  return { icon: '↑', cls: 'trend-up',   text: '+' + p.toFixed(1) + '%' };
+  if (p < -5) return { icon: '↓', cls: 'trend-down', text: p.toFixed(1) + '%' };
+  return { icon: '→', cls: 'trend-flat', text: (p > 0 ? '+' : '') + p.toFixed(1) + '%' };
+}
+
+// Get last N days of daily totals for a sparkline
+function getDailyTotals(rows, dateCol, valueCol, n) {
+  if (!dateCol) {
+    return rows.slice(-n).map((r, i) => ({ label: String(i + 1), val: typeof r[valueCol] === 'number' ? r[valueCol] : 0 }));
+  }
+  const dated = rows.map(r => ({ val: typeof r[valueCol] === 'number' ? r[valueCol] : 0, d: parseRowDate(r[dateCol]) })).filter(x => x.d);
+  const byDay = {};
+  dated.forEach(({ val, d }) => {
+    const key = d.toDateString();
+    byDay[key] = (byDay[key] || { d, total: 0 });
+    byDay[key].total += val;
+  });
+  const days = Object.values(byDay).sort((a, b) => a.d - b.d).slice(-n);
+  return days.map(x => ({ label: x.d.toLocaleDateString('en-KE', { day: 'numeric', month: 'short' }), val: x.total }));
+}
+
 // ── Overview ──────────────────────────────────────────────────────────────────
 function renderOverview(container) {
   container.classList.add('fade-in');
+
+  // ── Extra CSS injected once
+  if (!document.getElementById('ov-styles')) {
+    const s = document.createElement('style');
+    s.id = 'ov-styles';
+    s.textContent = `
+      .ov-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); margin: 1.5rem 0 0.75rem; }
+      .ov-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 0.5rem; }
+      .ov-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.1rem 1.25rem; cursor: pointer; transition: box-shadow 0.15s; }
+      .ov-kpi:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
+      .ov-kpi-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 4px; }
+      .ov-kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+      .ov-kpi-sheet { font-size: 10px; color: var(--text-faint); margin-top: 1px; }
+      .ov-kpi-value { font-size: 26px; font-weight: 700; letter-spacing: -1px; line-height: 1.1; margin: 6px 0 4px; }
+      .ov-kpi-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+      .trend-up   { color: #1a7f4b; background: #d8f3dc; padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+      .trend-down { color: #a0402a; background: #fde0d8; padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+      .trend-flat { color: #7a7268; background: #f0ede8; padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+      .ov-kpi-prev { font-size: 11px; color: var(--text-faint); }
+      .ov-kpi-bar { height: 3px; border-radius: 2px; margin-top: 10px; background: var(--border); overflow: hidden; }
+      .ov-kpi-bar-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+
+      .ov-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+      @media (max-width: 900px) { .ov-two-col { grid-template-columns: 1fr; } }
+
+      .ov-three-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+
+      .ov-alert { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-radius: 10px; margin-bottom: 8px; font-size: 13px; }
+      .ov-alert-warn { background: #fef9ec; border: 1px solid #f5d97a; }
+      .ov-alert-good { background: #f0faf4; border: 1px solid #a8daba; }
+      .ov-alert-info { background: #f0f4ff; border: 1px solid #b3c5f5; }
+      .ov-alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+      .ov-alert-text { flex: 1; }
+      .ov-alert-title { font-weight: 600; margin-bottom: 1px; }
+      .ov-alert-sub { color: var(--text-muted); font-size: 12px; }
+
+      .perf-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+      .perf-table th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); padding: 0 6px 6px; text-align: left; }
+      .perf-table td { padding: 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+      .perf-table tr:last-child td { border-bottom: none; }
+      .perf-bar-wrap { background: var(--border); border-radius: 3px; height: 6px; width: 80px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
+      .perf-bar-fill { height: 100%; border-radius: 3px; }
+      .rank-num { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; background: var(--bg); color: var(--text-muted); flex-shrink: 0; }
+      .rank-1 { background: #fde8a0; color: #7a5c00; }
+      .rank-2 { background: #e8e8e8; color: #555; }
+      .rank-3 { background: #fce0cc; color: #7a3a1a; }
+    `;
+    document.head.appendChild(s);
+  }
+
+  const today = new Date().toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
   container.innerHTML = `
-    <div class="page-header">
-      <div class="page-title">Operations Overview</div>
-      <div class="page-subtitle">All departments · live data · ${sheetMeta.length} sheet${sheetMeta.length !== 1 ? 's' : ''} loaded</div>
+    <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div>
+        <div class="page-title">Daily Performance Overview</div>
+        <div class="page-subtitle">${today} · ${sheetMeta.length} department${sheetMeta.length !== 1 ? 's' : ''} · live data</div>
+      </div>
+      <button class="btn btn-primary" onclick="loadAllData()" style="margin-top:4px;">↻ Refresh</button>
     </div>`;
 
-  // Summary bar — one cell per discovered sheet
+  // ── 1. KPI Cards (today vs previous period) ────────────────────────────────
+  const kpiTitle = document.createElement('div');
+  kpiTitle.className = 'ov-section-title';
+  kpiTitle.textContent = '📊 Key Performance Indicators — Latest vs Previous Period';
+  container.appendChild(kpiTitle);
+
+  const kpiGrid = document.createElement('div');
+  kpiGrid.className = 'ov-kpi-grid';
+
+  const alerts = [];
+
+  sheetMeta.forEach(({ name, color }, si) => {
+    const sheet   = allData[name];
+    const nums    = getNumCols(sheet.cols, sheet.rows);
+    if (!nums.length) return;
+    const dateCol = getDateCol(sheet.cols, sheet.rows);
+    const { today: todayRows, prev: prevRows, label, prevLabel } = getLatestRows(sheet.rows, dateCol);
+
+    nums.slice(0, 3).forEach((col, ci) => {
+      const unit     = detectUnit(name, col);
+      const todayVal = todayRows.reduce((s, r) => s + (typeof r[col] === 'number' ? r[col] : 0), 0);
+      const prevVal  = prevRows.reduce((s, r) => s + (typeof r[col] === 'number' ? r[col] : 0), 0);
+      const change   = pct(todayVal, prevVal);
+      const trend    = trendArrow(change);
+      // Progress vs max ever
+      const allVals  = sheet.rows.map(r => typeof r[col] === 'number' ? r[col] : 0);
+      const maxVal   = Math.max(...allVals);
+      const pctOfMax = maxVal ? (todayVal / maxVal) * 100 : 0;
+
+      // Generate alerts
+      if (change !== null && change < -15) alerts.push({ type: 'warn', sheet: name, col, change, label });
+      if (change !== null && change > 20)  alerts.push({ type: 'good', sheet: name, col, change, label });
+
+      const card = document.createElement('div');
+      card.className = 'ov-kpi';
+      card.onclick   = () => switchTab(name);
+      card.style.borderTop = `3px solid ${color.main}`;
+      card.innerHTML = `
+        <div class="ov-kpi-top">
+          <div>
+            <div class="ov-kpi-label">${col}</div>
+            <div class="ov-kpi-sheet">${name}</div>
+          </div>
+          <span class="${trend.cls}">${trend.icon} ${trend.text}</span>
+        </div>
+        <div class="ov-kpi-value" style="color:${color.main}">${fmtU(todayVal, unit)}</div>
+        <div class="ov-kpi-footer">
+          <span class="ov-kpi-prev">Prev: ${fmtU(prevVal, unit) || '—'}</span>
+          <span style="font-size:11px;color:var(--text-faint)">${label}</span>
+        </div>
+        <div class="ov-kpi-bar"><div class="ov-kpi-bar-fill" style="width:${Math.min(pctOfMax,100)}%;background:${color.main}"></div></div>
+      `;
+      kpiGrid.appendChild(card);
+    });
+  });
+  container.appendChild(kpiGrid);
+
+  // ── 2. Alerts / Flags ─────────────────────────────────────────────────────
+  if (alerts.length) {
+    const aTitle = document.createElement('div');
+    aTitle.className = 'ov-section-title';
+    aTitle.textContent = '🚦 Management Alerts';
+    container.appendChild(aTitle);
+    const aWrap = document.createElement('div');
+    alerts.forEach(a => {
+      const isWarn = a.type === 'warn';
+      const div = document.createElement('div');
+      div.className = `ov-alert ov-alert-${a.type}`;
+      div.innerHTML = `
+        <div class="ov-alert-icon">${isWarn ? '⚠️' : '✅'}</div>
+        <div class="ov-alert-text">
+          <div class="ov-alert-title">${isWarn ? 'Decline detected' : 'Strong performance'}: ${a.col} (${a.sheet})</div>
+          <div class="ov-alert-sub">${isWarn ? 'Down' : 'Up'} ${Math.abs(a.change).toFixed(1)}% compared to previous period · as of ${a.label}</div>
+        </div>`;
+      aWrap.appendChild(div);
+    });
+    container.appendChild(aWrap);
+  }
+
+  // ── 3. Trend Charts — last 14 periods per sheet ───────────────────────────
+  const trendTitle = document.createElement('div');
+  trendTitle.className = 'ov-section-title';
+  trendTitle.textContent = '📈 14-Period Trend — Primary Metric per Department';
+  container.appendChild(trendTitle);
+
+  const trendGrid = document.createElement('div');
+  trendGrid.className = 'ov-three-col';
+
+  sheetMeta.forEach(({ name, color }) => {
+    const sheet   = allData[name];
+    const nums    = getNumCols(sheet.cols, sheet.rows);
+    if (!nums.length || sheet.rows.length < 2) return;
+    const dateCol  = getDateCol(sheet.cols, sheet.rows);
+    const valueCol = nums[0];
+    const unit     = detectUnit(name, valueCol);
+    const daily    = getDailyTotals(sheet.rows, dateCol, valueCol, 14);
+    const vals     = daily.map(d => d.val);
+    const total    = vals.reduce((a, b) => a + b, 0);
+    const avg      = vals.length ? total / vals.length : 0;
+    const latest   = vals[vals.length - 1] || 0;
+    const latestChg = pct(latest, avg);
+    const trend    = trendArrow(latestChg);
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.cursor = 'pointer';
+    card.onclick = () => switchTab(name);
+    card.innerHTML = `
+      <div class="card-header">
+        <div>
+          <div class="card-title">${name}</div>
+          <div class="card-sub">${valueCol}${unit ? ' (' + unit + ')' : ''} · ${daily.length}-period avg: ${fmtU(avg, unit, 1)}</div>
+        </div>
+        <span class="${trend.cls}">${trend.icon} ${trend.text} vs avg</span>
+      </div>`;
+    const cid = 'ov_trend_' + name.replace(/\W/g, '');
+    const { wrap, canvas } = makeCanvas(cid, 160);
+    card.appendChild(wrap);
+    trendGrid.appendChild(card);
+
+    setTimeout(() => {
+      // Draw avg line as annotation dataset
+      const avgArr = vals.map(() => avg);
+      chartInst[cid] = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: daily.map(d => d.label),
+          datasets: [
+            {
+              label: valueCol, data: vals,
+              borderColor: color.main, backgroundColor: color.main + '20',
+              borderWidth: 2.5, fill: true, tension: 0.35, pointRadius: 3, pointHoverRadius: 6
+            },
+            {
+              label: 'Average', data: avgArr,
+              borderColor: color.main + '55', backgroundColor: 'transparent',
+              borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => ctx.dataset.label === 'Average' ? ` Avg: ${fmtU(ctx.parsed.y, unit, 1)}` : ` ${fmtU(ctx.parsed.y, unit)}` } }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 9, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 7 } },
+            y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 9, family: 'DM Mono' }, callback: v => fmt(v) + (unit ? ' ' + unit : '') } }
+          }
+        }
+      });
+    }, 60 + sheetMeta.indexOf(sheetMeta.find(s => s.name === name)) * 30);
+  });
+  container.appendChild(trendGrid);
+
+  // ── 4. Department Performance Ranking ─────────────────────────────────────
+  const rankTitle = document.createElement('div');
+  rankTitle.className = 'ov-section-title';
+  rankTitle.textContent = '🏆 Department Performance Ranking — Latest Period';
+  container.appendChild(rankTitle);
+
+  const twoCol = document.createElement('div');
+  twoCol.className = 'ov-two-col';
+
+  // Build ranking rows across all sheets+numeric cols
+  const rankRows = [];
+  sheetMeta.forEach(({ name, color }) => {
+    const sheet   = allData[name];
+    const nums    = getNumCols(sheet.cols, sheet.rows);
+    const dateCol = getDateCol(sheet.cols, sheet.rows);
+    const { today: todayRows, prev: prevRows, label } = getLatestRows(sheet.rows, dateCol);
+    nums.slice(0, 2).forEach(col => {
+      const unit     = detectUnit(name, col);
+      const todayVal = todayRows.reduce((s, r) => s + (typeof r[col] === 'number' ? r[col] : 0), 0);
+      const prevVal  = prevRows.reduce((s, r) => s + (typeof r[col] === 'number' ? r[col] : 0), 0);
+      const change   = pct(todayVal, prevVal);
+      rankRows.push({ name, col, unit, todayVal, prevVal, change, color, label });
+    });
+  });
+
+  // Top performers (sorted by % change desc, positive only)
+  const positives = [...rankRows].filter(r => r.change !== null).sort((a, b) => b.change - a.change);
+  const negatives = [...rankRows].filter(r => r.change !== null).sort((a, b) => a.change - b.change);
+  const maxAbsChange = Math.max(...rankRows.filter(r=>r.change!==null).map(r=>Math.abs(r.change)), 1);
+
+  function buildRankCard(title, rows, good) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `<div class="card-header"><div class="card-title">${title}</div></div>`;
+    const tbl = document.createElement('table');
+    tbl.className = 'perf-table';
+    tbl.innerHTML = `<thead><tr><th>#</th><th>Metric</th><th>Latest</th><th>vs Prev</th><th>Bar</th></tr></thead>`;
+    const tbody = document.createElement('tbody');
+    rows.slice(0, 5).forEach((r, i) => {
+      const trend = trendArrow(r.change);
+      const barPct = Math.min((Math.abs(r.change) / maxAbsChange) * 100, 100);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><span class="rank-num rank-${i+1}">${i+1}</span></td>
+        <td><div style="font-weight:500">${r.col}</div><div style="font-size:10px;color:var(--text-faint)">${r.name}</div></td>
+        <td class="td-num">${fmtU(r.todayVal, r.unit)}</td>
+        <td><span class="${trend.cls}">${trend.text}</span></td>
+        <td><div class="perf-bar-wrap"><div class="perf-bar-fill" style="width:${barPct}%;background:${good ? '#2d6a4f' : '#a0402a'}"></div></div></td>`;
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    card.appendChild(tbl);
+    return card;
+  }
+
+  twoCol.appendChild(buildRankCard('🟢 Top Performers', positives, true));
+  twoCol.appendChild(buildRankCard('🔴 Needs Attention', negatives, false));
+  container.appendChild(twoCol);
+
+  // ── 5. Department Summary Bar (click to drill down) ───────────────────────
+  const sumTitle = document.createElement('div');
+  sumTitle.className = 'ov-section-title';
+  sumTitle.textContent = '🗂️ Department Totals — Click to Drill Down';
+  container.appendChild(sumTitle);
+
   const bar = document.createElement('div');
   bar.className = 'summary-bar';
   sheetMeta.forEach(({ name, color }) => {
@@ -422,63 +763,20 @@ function renderOverview(container) {
     const primaryCol = nums[0] || null;
     const unit  = primaryCol ? detectUnit(name, primaryCol) : '';
     const total = primaryCol ? colSum(sheet.rows, primaryCol) : 0;
-    const sub   = `${sheet.rows.length} rows${primaryCol ? ' · ' + primaryCol : ''}`;
-    const cell  = document.createElement('div');
+    const dateCol = getDateCol(sheet.cols, sheet.rows);
+    const { today: todayRows, label } = getLatestRows(sheet.rows, dateCol);
+    const todayVal = primaryCol ? todayRows.reduce((s, r) => s + (typeof r[primaryCol] === 'number' ? r[primaryCol] : 0), 0) : 0;
+
+    const cell = document.createElement('div');
     cell.className = 'sbi';
     cell.onclick   = () => switchTab(name);
     cell.innerHTML = `
-      <div class="sbi-label">${name}</div>
-      <div class="sbi-value">${fmtU(total, unit)}</div>
-      <div class="sbi-sub">${sub}</div>`;
+      <div class="sbi-label" style="color:${color.main}">${name}</div>
+      <div class="sbi-value">${fmtU(todayVal, unit) || '—'}</div>
+      <div class="sbi-sub">${label} · All-time: ${fmtU(total, unit)}</div>`;
     bar.appendChild(cell);
   });
   container.appendChild(bar);
-
-  // Mini trend card per sheet
-  const grid = document.createElement('div');
-  grid.className = 'charts-row';
-  sheetMeta.forEach(({ name, color }) => {
-    const sheet = allData[name];
-    const nums  = getNumCols(sheet.cols, sheet.rows);
-    if (!nums.length || sheet.rows.length < 2) return;
-    const labelCol  = getLabelCol(sheet.cols, sheet.rows);
-    const valueCol  = nums[0];
-    const unit      = detectUnit(name, valueCol);
-    const sliced    = sheet.rows.slice(0, 16);
-    const total     = colSum(sheet.rows, valueCol);
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML = `
-      <div class="card-header">
-        <div>
-          <div class="card-title">${name}</div>
-          <div class="card-sub">${valueCol}${unit ? ' (' + unit + ')' : ''} · ${sheet.rows.length} rows · ${nums.length} numeric col${nums.length !== 1 ? 's' : ''}</div>
-        </div>
-        <span class="metric-badge badge-${color.badge}">${fmtU(total, unit)}</span>
-      </div>`;
-    const cid = 'ov_' + name.replace(/\W/g, '');
-    const { wrap, canvas } = makeCanvas(cid, 180);
-    card.appendChild(wrap);
-    grid.appendChild(card);
-    setTimeout(() => {
-      chartInst[cid] = new Chart(canvas, {
-        type: 'line',
-        data: {
-          labels: sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : ''),
-          datasets: [{ data: sliced.map(r => typeof r[valueCol] === 'number' ? r[valueCol] : 0), borderColor: color.main, backgroundColor: color.main + '18', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 2, pointHoverRadius: 5 }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + fmtU(ctx.parsed.y, unit) } } },
-          scales: {
-            x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 7 } },
-            y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) + (unit ? ' ' + unit : '') } }
-          }
-        }
-      });
-    }, 50);
-  });
-  container.appendChild(grid);
 }
 
 // ── Single sheet ──────────────────────────────────────────────────────────────
