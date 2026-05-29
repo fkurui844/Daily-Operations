@@ -1209,84 +1209,454 @@ function renderSheet(name, sheet, container) {
     chartsRow.className = 'charts-row';
     const MAX_CHART_ROWS = 30;
     const sliced = rows.slice(0, MAX_CHART_ROWS);
+    const isSalesSheet   = name.toLowerCase().includes('sale');
+    const isFinanceSheet = name.toLowerCase().includes('financ') || name.toLowerCase().includes('cash') || name.toLowerCase().includes('credit') || name.toLowerCase().includes('payment');
 
-    // Bar — primary numeric column (first found); label = exact column name
-    const primaryCol  = nums[0];
-    const primaryUnit = detectUnit(name, primaryCol);
-    const barCard = document.createElement('div');
-    barCard.className = 'card';
-    barCard.innerHTML = `
-      <div class="card-header">
-        <div>
-          <div class="card-title">${primaryCol}${primaryUnit ? ' (' + primaryUnit + ')' : ''}</div>
-          <div class="card-sub">by ${labelCol}${rows.length > MAX_CHART_ROWS ? ' · first ' + MAX_CHART_ROWS + ' rows' : ''}</div>
-        </div>
-      </div>`;
-    const barId = name.replace(/\W/g,'') + '_bar';
-    const { wrap: bw, canvas: bc } = makeCanvas(barId, 260);
-    barCard.appendChild(bw);
-    chartsRow.appendChild(barCard);
-    setTimeout(() => {
-      chartInst[barId] = new Chart(bc, {
-        type: 'bar',
-        data: {
-          labels: sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 14) : ''),
-          datasets: [{ label: primaryCol, data: sliced.map(r => typeof r[primaryCol] === 'number' ? r[primaryCol] : 0), backgroundColor: color.main + 'cc', borderColor: color.main, borderWidth: 1, borderRadius: 4 }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${primaryCol}: ${fmtU(ctx.parsed.y, primaryUnit)}` } } },
-          scales: {
-            x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: rows.length > 14 } },
-            y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) + (primaryUnit ? ' ' + primaryUnit : '') } }
-          }
-        }
-      });
-    }, 50);
+    const isMilkSheet = name.toLowerCase().includes('milk') || name.toLowerCase().includes('intake');
 
-    // Multi-series line — ALL numeric columns, each labelled with exact column name
-    if (nums.length > 1) {
-      const lineCard = document.createElement('div');
-      lineCard.className = 'card';
-      // Build a colour palette sized to the number of numeric columns
-      const palette = nums.map((_, i) => {
-        const hues = [color.main, '#52b788','#95d5b2','#74b9e0','#f4a261','#e76f51','#a8dadc','#457b9d'];
-        return hues[i % hues.length];
-      });
-      // Legend uses exact column names
-      const legendEl = document.createElement('div');
-      legendEl.className = 'legend';
-      nums.forEach((col, i) => {
-        const u = detectUnit(name, col);
-        legendEl.innerHTML += `<div class="legend-item"><div class="legend-swatch" style="background:${palette[i]}"></div>${col}${u ? ' (' + u + ')' : ''}</div>`;
-      });
-      lineCard.innerHTML = `<div class="card-header"><div><div class="card-title">All metrics — trend</div><div class="card-sub">${nums.length} columns</div></div></div>`;
-      lineCard.appendChild(legendEl);
-      const lineId = name.replace(/\W/g,'') + '_line';
-      const { wrap: lw, canvas: lc } = makeCanvas(lineId, 260);
-      lineCard.appendChild(lw);
-      chartsRow.appendChild(lineCard);
+    // Bar chart — skip for Sales, Finance and Milk Intake sheets (replaced by better charts)
+    if (!isSalesSheet && !isFinanceSheet && !isMilkSheet) {
+      const primaryCol  = nums[0];
+      const primaryUnit = detectUnit(name, primaryCol);
+      const barCard = document.createElement('div');
+      barCard.className = 'card';
+      barCard.innerHTML = `
+        <div class="card-header">
+          <div>
+            <div class="card-title">${primaryCol}${primaryUnit ? ' (' + primaryUnit + ')' : ''}</div>
+            <div class="card-sub">by ${labelCol}${rows.length > MAX_CHART_ROWS ? ' · first ' + MAX_CHART_ROWS + ' rows' : ''}</div>
+          </div>
+        </div>`;
+      const barId = name.replace(/\W/g,'') + '_bar';
+      const { wrap: bw, canvas: bc } = makeCanvas(barId, 260);
+      barCard.appendChild(bw);
+      chartsRow.appendChild(barCard);
       setTimeout(() => {
-        chartInst[lineId] = new Chart(lc, {
-          type: 'line',
+        chartInst[barId] = new Chart(bc, {
+          type: 'bar',
           data: {
-            labels: sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : ''),
-            datasets: nums.map((col, i) => {
-              const u = detectUnit(name, col);
-              return { label: col + (u ? ' (' + u + ')' : ''), data: sliced.map(r => typeof r[col] === 'number' ? r[col] : 0), borderColor: palette[i], backgroundColor: 'transparent', borderWidth: 2, tension: 0.3, pointRadius: 3, borderDash: i % 2 === 1 ? [4,3] : [] };
-            })
+            labels: sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 14) : ''),
+            datasets: [{ label: primaryCol, data: sliced.map(r => typeof r[primaryCol] === 'number' ? r[primaryCol] : 0), backgroundColor: color.main + 'cc', borderColor: color.main, borderWidth: 1, borderRadius: 4 }]
           },
           options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => { const col = nums[ctx.datasetIndex]; return ` ${col}: ${fmtU(ctx.parsed.y, detectUnit(name, col))}`; } } } },
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${primaryCol}: ${fmtU(ctx.parsed.y, primaryUnit)}` } } },
             scales: {
-              x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 8 } },
-              y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) } }
+              x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: rows.length > 14 } },
+              y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) + (primaryUnit ? ' ' + primaryUnit : '') } }
             }
           }
         });
-      }, 80);
+      }, 50);
     }
+
+    // ── Trend chart: dynamic toggle for Sales/Finance, generic for others ────
+    if (nums.length > 1) {
+
+      if (isSalesSheet) {
+        // ── SALES: Volume vs Revenue toggle chart ────────────────────────────
+        const volCol2 = findCol(cols, ['volume','litr','ltr','qty','quantity','sold','dispatched']) || nums.find(c => detectUnit(name,c) === 'L') || nums[0];
+        const kesCol2 = findCol(cols, ['amount','revenue','ksh','kes','value','total','income','payment']) || nums.find(c => detectUnit(name,c) === 'KES') || nums[1];
+
+        const volUnit = detectUnit(name, volCol2);
+        const kesUnit = detectUnit(name, kesCol2);
+
+        const lineCard = document.createElement('div');
+        lineCard.className = 'card';
+        const lineId = name.replace(/\W/g,'') + '_line';
+
+        // Build toggle buttons + chart
+        lineCard.innerHTML = `
+          <div class="card-header" style="flex-wrap:wrap;gap:8px;">
+            <div>
+              <div class="card-title">Trend</div>
+              <div class="card-sub" id="${lineId}_sub">Showing: Volume (L)</div>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <button id="${lineId}_btn_vol" onclick="salesChartSwitch('${lineId}','vol')"
+                style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid ${color.main};background:${color.main};color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s">
+                📦 Volume (L)
+              </button>
+              <button id="${lineId}_btn_kes" onclick="salesChartSwitch('${lineId}','kes')"
+                style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s">
+                💰 Revenue (KES)
+              </button>
+              <button id="${lineId}_btn_both" onclick="salesChartSwitch('${lineId}','both')"
+                style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s">
+                ⚡ Both
+              </button>
+            </div>
+          </div>`;
+
+        const { wrap: lw, canvas: lc } = makeCanvas(lineId, 270);
+        lineCard.appendChild(lw);
+        chartsRow.appendChild(lineCard);
+
+        const labels2 = sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : '');
+        const volData  = sliced.map(r => typeof r[volCol2] === 'number' ? r[volCol2] : 0);
+        const kesData  = sliced.map(r => typeof r[kesCol2] === 'number' ? r[kesCol2] : 0);
+
+        const volDataset = {
+          label: `${volCol2} (${volUnit||'L'})`,
+          data: volData,
+          borderColor: color.main,
+          backgroundColor: color.main + '18',
+          fill: true,
+          borderWidth: 2,
+          tension: 0.35,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          yAxisID: 'y',
+        };
+        const kesDataset = {
+          label: `${kesCol2} (${kesUnit||'KES'})`,
+          data: kesData,
+          borderColor: '#1b4f72',
+          backgroundColor: '#1b4f7218',
+          fill: true,
+          borderWidth: 2,
+          tension: 0.35,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          yAxisID: 'y2',
+        };
+
+        // Store data on window for the toggle function to access
+        window[lineId + '_data'] = { labels: labels2, volDataset, kesDataset, volCol: volCol2, kesCol: kesCol2, volUnit, kesUnit, color };
+
+        setTimeout(() => {
+          chartInst[lineId] = new Chart(lc, {
+            type: 'line',
+            data: { labels: labels2, datasets: [volDataset] },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              interaction: { mode: 'index', intersect: false },
+              plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` } }
+              },
+              scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 10 } },
+                y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) + (volUnit ? ' '+volUnit : '') }, position: 'left' },
+                y2: { display: false, position: 'right', grid: { drawOnChartArea: false } }
+              }
+            }
+          });
+        }, 80);
+
+      } else if (isMilkSheet) {
+        // ── MILK INTAKE: per-station toggle chart ────────────────────────────
+        const totalsCol2  = cols.find(c => /\btotals?\b/i.test(c) && nums.includes(c));
+        const stationCols2 = nums.filter(c => c !== totalsCol2);
+        // Colour palette per station
+        const stPalette = ['#2d6a4f','#52b788','#1b4f72','#c97b2a','#6b3fa0','#a0402a','#0e6655','#74b9e0','#f4a261','#457b9d'];
+
+        const lineCard = document.createElement('div');
+        lineCard.className = 'card';
+        lineCard.style.gridColumn = '1 / -1';
+        const lineId = name.replace(/\W/g,'') + '_line';
+
+        // Build station toggle buttons
+        const stBtns = stationCols2.map((col, i) => `
+          <button id="${lineId}_btn_${i}" onclick="milkChartSwitch('${lineId}',${i})"
+            style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid ${stPalette[i % stPalette.length]};background:var(--surface);color:${stPalette[i % stPalette.length]};cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap">
+            ${col}
+          </button>`).join('');
+        const allBtnStyle = `padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid #333;background:#333;color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s`;
+        const totalsBtnStyle = totalsCol2
+          ? `padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid ${color.main};background:var(--surface);color:${color.main};cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s`
+          : '';
+
+        lineCard.innerHTML = `
+          <div class="card-header" style="flex-wrap:wrap;gap:8px;margin-bottom:.5rem;">
+            <div>
+              <div class="card-title">Station Intake Trend</div>
+              <div class="card-sub" id="${lineId}_sub">Showing: All Stations</div>
+            </div>
+            <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
+              <button id="${lineId}_btn_all" onclick="milkChartSwitch('${lineId}','all')"
+                style="${allBtnStyle}">⚡ All</button>
+              ${totalsCol2 ? `<button id="${lineId}_btn_totals" onclick="milkChartSwitch('${lineId}','totals')"
+                style="${totalsBtnStyle}">📊 Totals</button>` : ''}
+              ${stBtns}
+            </div>
+          </div>`;
+
+        const { wrap: lw, canvas: lc } = makeCanvas(lineId, 290);
+        lineCard.appendChild(lw);
+        chartsRow.appendChild(lineCard);
+
+        const labels4 = sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : '');
+        const stDatasets = stationCols2.map((col, i) => ({
+          label: col + ' (L)',
+          data: sliced.map(r => typeof r[col] === 'number' ? r[col] : 0),
+          borderColor: stPalette[i % stPalette.length],
+          backgroundColor: stPalette[i % stPalette.length] + '18',
+          borderWidth: 2, tension: 0.3, pointRadius: 2, pointHoverRadius: 5, fill: false,
+        }));
+        const totalsDataset = totalsCol2 ? {
+          label: totalsCol2 + ' (L)',
+          data: sliced.map(r => typeof r[totalsCol2] === 'number' ? r[totalsCol2] : 0),
+          borderColor: color.main, backgroundColor: color.main + '22',
+          borderWidth: 2.5, tension: 0.3, pointRadius: 3, pointHoverRadius: 5, fill: true,
+        } : null;
+
+        window[lineId + '_milk'] = { labels: labels4, stDatasets, totalsDataset, stationCols: stationCols2, totalsCol: totalsCol2, palette: stPalette, color };
+
+        setTimeout(() => {
+          chartInst[lineId] = new Chart(lc, {
+            type: 'line',
+            data: { labels: labels4, datasets: [...stDatasets, ...(totalsDataset ? [totalsDataset] : [])] },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              interaction: { mode: 'index', intersect: false },
+              plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)} L` } }
+              },
+              scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 10 } },
+                y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) + ' L' } }
+              }
+            }
+          });
+        }, 80);
+
+      } else if (isFinanceSheet) {
+        // ── FINANCE: Cash vs Credit vs Totals toggle chart ──────────────────
+        const cashCol2   = findCol(cols, ['cash','paid','payment','received.cash','cash.in','cash.col']) || nums[0];
+        const creditCol2 = findCol(cols, ['credit','mpesa','cheque','invoice','debt','pending','receivable','credit.sale']) || nums[1];
+        const totalCol2  = findCol(cols, ['total','amount','revenue','income','collection','totals']) || nums.find(c => c !== cashCol2 && c !== creditCol2);
+
+        const lineCard = document.createElement('div');
+        lineCard.className = 'card';
+        lineCard.style.gridColumn = '1 / -1';
+        const lineId = name.replace(/\W/g,'') + '_line';
+
+        lineCard.innerHTML = `
+          <div class="card-header" style="flex-wrap:wrap;gap:8px;">
+            <div>
+              <div class="card-title">Collections Trend</div>
+              <div class="card-sub" id="${lineId}_sub">Showing: Cash (KES)</div>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <button id="${lineId}_btn_cash" onclick="finChartSwitch('${lineId}','cash')"
+                style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid ${color.main};background:${color.main};color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s">
+                💵 Cash
+              </button>
+              <button id="${lineId}_btn_credit" onclick="finChartSwitch('${lineId}','credit')"
+                style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s">
+                🧾 Credit
+              </button>
+              ${totalCol2 ? `<button id="${lineId}_btn_total" onclick="finChartSwitch('${lineId}','total')"
+                style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s">
+                📊 Totals
+              </button>` : ''}
+              <button id="${lineId}_btn_both" onclick="finChartSwitch('${lineId}','both')"
+                style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s">
+                ⚡ All
+              </button>
+            </div>
+          </div>`;
+
+        const { wrap: lw, canvas: lc } = makeCanvas(lineId, 280);
+        lineCard.appendChild(lw);
+        chartsRow.appendChild(lineCard);
+
+        const labels3    = sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : '');
+        const cashData   = sliced.map(r => cashCol2   && typeof r[cashCol2]   === 'number' ? r[cashCol2]   : 0);
+        const creditData = sliced.map(r => creditCol2 && typeof r[creditCol2] === 'number' ? r[creditCol2] : 0);
+        const totalData  = sliced.map(r => totalCol2  && typeof r[totalCol2]  === 'number' ? r[totalCol2]  : 0);
+
+        const mkDS = (label, data, clr, fill) => ({
+          label, data,
+          borderColor: clr, backgroundColor: clr + (fill ? '22' : '00'),
+          fill: !!fill, borderWidth: 2, tension: 0.35, pointRadius: 3, pointHoverRadius: 5,
+        });
+        const cashDS   = mkDS(`${cashCol2} (KES)`,   cashData,   color.main, true);
+        const creditDS = mkDS(`${creditCol2} (KES)`, creditData, '#6b3fa0',  true);
+        const totalDS  = mkDS(`${totalCol2} (KES)`,  totalData,  '#1b4f72',  false);
+
+        window[lineId + '_fin'] = { labels: labels3, cashDS, creditDS, totalDS, cashCol: cashCol2, creditCol: creditCol2, totalCol: totalCol2, color, hasTotals: !!totalCol2 };
+
+        setTimeout(() => {
+          chartInst[lineId] = new Chart(lc, {
+            type: 'line',
+            data: { labels: labels3, datasets: [cashDS] },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              interaction: { mode: 'index', intersect: false },
+              plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: KES ${fmt(ctx.parsed.y)}` } }
+              },
+              scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 10 } },
+                y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) } }
+              }
+            }
+          });
+        }, 80);
+
+      } else if (!isFinanceSheet) {
+        // ── GENERIC multi-series line for non-Sales, non-Finance sheets ──────
+        const lineCard = document.createElement('div');
+        lineCard.className = 'card';
+        const palette = nums.map((_, i) => {
+          const hues = [color.main, '#52b788','#95d5b2','#74b9e0','#f4a261','#e76f51','#a8dadc','#457b9d'];
+          return hues[i % hues.length];
+        });
+        const legendEl = document.createElement('div');
+        legendEl.className = 'legend';
+        nums.forEach((col, i) => {
+          const u = detectUnit(name, col);
+          legendEl.innerHTML += `<div class="legend-item"><div class="legend-swatch" style="background:${palette[i]}"></div>${col}${u ? ' (' + u + ')' : ''}</div>`;
+        });
+        lineCard.innerHTML = `<div class="card-header"><div><div class="card-title">All metrics — trend</div><div class="card-sub">${nums.length} columns</div></div></div>`;
+        lineCard.appendChild(legendEl);
+        const lineId = name.replace(/\W/g,'') + '_line';
+        const { wrap: lw, canvas: lc } = makeCanvas(lineId, 260);
+        lineCard.appendChild(lw);
+        chartsRow.appendChild(lineCard);
+        setTimeout(() => {
+          chartInst[lineId] = new Chart(lc, {
+            type: 'line',
+            data: {
+              labels: sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : ''),
+              datasets: nums.map((col, i) => {
+                const u = detectUnit(name, col);
+                return { label: col + (u ? ' (' + u + ')' : ''), data: sliced.map(r => typeof r[col] === 'number' ? r[col] : 0), borderColor: palette[i], backgroundColor: 'transparent', borderWidth: 2, tension: 0.3, pointRadius: 3, borderDash: i % 2 === 1 ? [4,3] : [] };
+              })
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => { const col = nums[ctx.datasetIndex]; return ` ${col}: ${fmtU(ctx.parsed.y, detectUnit(name, col))}`; } } } },
+              scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 8 } },
+                y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) } }
+              }
+            }
+          });
+        }, 80);
+      }
+    }
+
+    // ── Sales chart toggle function (global so onclick can reach it) ──────────
+    window.salesChartSwitch = function(lineId, mode) {
+      const inst = chartInst[lineId];
+      const d    = window[lineId + '_data'];
+      if (!inst || !d) return;
+
+      // Update button styles
+      ['vol','kes','both'].forEach(m => {
+        const btn = document.getElementById(`${lineId}_btn_${m}`);
+        if (!btn) return;
+        const active = m === mode;
+        btn.style.background    = active ? d.color.main : 'var(--surface)';
+        btn.style.color         = active ? '#fff' : 'var(--text-muted)';
+        btn.style.borderColor   = active ? d.color.main : 'var(--border)';
+      });
+
+      const subEl = document.getElementById(`${lineId}_sub`);
+
+      if (mode === 'vol') {
+        inst.data.datasets = [d.volDataset];
+        inst.options.scales.y.display  = true;
+        inst.options.scales.y2.display = false;
+        inst.options.scales.y.ticks.callback = v => fmt(v) + (d.volUnit ? ' '+d.volUnit : '');
+        if (subEl) subEl.textContent = `Showing: Volume (${d.volUnit || 'L'})`;
+      } else if (mode === 'kes') {
+        inst.data.datasets = [{ ...d.kesDataset, yAxisID: 'y' }];
+        inst.options.scales.y.display  = true;
+        inst.options.scales.y2.display = false;
+        inst.options.scales.y.ticks.callback = v => fmt(v) + (d.kesUnit ? ' '+d.kesUnit : '');
+        if (subEl) subEl.textContent = `Showing: Revenue (${d.kesUnit || 'KES'})`;
+      } else {
+        // Both — dual Y axes
+        inst.data.datasets = [d.volDataset, d.kesDataset];
+        inst.options.scales.y.display  = true;
+        inst.options.scales.y2.display = true;
+        inst.options.scales.y.ticks.callback  = v => fmt(v) + ' ' + (d.volUnit||'L');
+        inst.options.scales.y2.ticks = { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) + ' ' + (d.kesUnit||'KES') };
+        if (subEl) subEl.textContent = 'Showing: Volume + Revenue';
+      }
+      inst.update();
+    };
+
+    // ── Finance chart toggle function ─────────────────────────────────────────
+    window.finChartSwitch = function(lineId, mode) {
+      const inst = chartInst[lineId];
+      const d    = window[lineId + '_fin'];
+      if (!inst || !d) return;
+
+      const btns = ['cash','credit','total','both'];
+      btns.forEach(m => {
+        const btn = document.getElementById(`${lineId}_btn_${m}`);
+        if (!btn) return;
+        const active = m === mode;
+        btn.style.background  = active ? d.color.main : 'var(--surface)';
+        btn.style.color       = active ? '#fff' : 'var(--text-muted)';
+        btn.style.borderColor = active ? d.color.main : 'var(--border)';
+      });
+
+      const subEl = document.getElementById(`${lineId}_sub`);
+      inst.options.scales.y.ticks.callback = v => fmt(v);
+
+      if (mode === 'cash') {
+        inst.data.datasets = [d.cashDS];
+        if (subEl) subEl.textContent = `Showing: Cash Collections (KES)`;
+      } else if (mode === 'credit') {
+        inst.data.datasets = [d.creditDS];
+        if (subEl) subEl.textContent = `Showing: Credit Collections (KES)`;
+      } else if (mode === 'total' && d.hasTotals) {
+        inst.data.datasets = [d.totalDS];
+        if (subEl) subEl.textContent = `Showing: Total Collections (KES)`;
+      } else {
+        // All — stack cash, credit, totals
+        const ds = [d.cashDS, d.creditDS];
+        if (d.hasTotals) ds.push(d.totalDS);
+        inst.data.datasets = ds;
+        if (subEl) subEl.textContent = 'Showing: Cash + Credit' + (d.hasTotals ? ' + Totals' : '');
+      }
+      inst.update();
+    };
+
+    // ── Milk Intake station toggle function ───────────────────────────────────
+    window.milkChartSwitch = function(lineId, mode) {
+      const inst = chartInst[lineId];
+      const d    = window[lineId + '_milk'];
+      if (!inst || !d) return;
+
+      const subEl = document.getElementById(`${lineId}_sub`);
+
+      // Reset all button styles
+      const allBtn = document.getElementById(`${lineId}_btn_all`);
+      const totBtn = document.getElementById(`${lineId}_btn_totals`);
+      if (allBtn) { allBtn.style.background = 'var(--surface)'; allBtn.style.color = '#333'; }
+      if (totBtn) { totBtn.style.background = 'var(--surface)'; totBtn.style.color = d.color.main; }
+      d.stationCols.forEach((_, i) => {
+        const btn = document.getElementById(`${lineId}_btn_${i}`);
+        if (btn) { btn.style.background = 'var(--surface)'; btn.style.color = d.palette[i % d.palette.length]; }
+      });
+
+      if (mode === 'all') {
+        inst.data.datasets = [...d.stDatasets, ...(d.totalsDataset ? [d.totalsDataset] : [])];
+        if (allBtn) { allBtn.style.background = '#333'; allBtn.style.color = '#fff'; }
+        if (subEl) subEl.textContent = 'Showing: All Stations';
+      } else if (mode === 'totals' && d.totalsDataset) {
+        inst.data.datasets = [d.totalsDataset];
+        if (totBtn) { totBtn.style.background = d.color.main; totBtn.style.color = '#fff'; }
+        if (subEl) subEl.textContent = `Showing: ${d.totalsCol} (L)`;
+      } else if (typeof mode === 'number') {
+        const ds  = d.stDatasets[mode];
+        const btn = document.getElementById(`${lineId}_btn_${mode}`);
+        inst.data.datasets = [ds];
+        if (btn) { btn.style.background = d.palette[mode % d.palette.length]; btn.style.color = '#fff'; }
+        if (subEl) subEl.textContent = `Showing: ${d.stationCols[mode]} (L)`;
+      }
+      inst.update();
+    };
+
     container.appendChild(chartsRow);
   }
 
