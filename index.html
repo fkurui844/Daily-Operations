@@ -231,55 +231,81 @@ function tabColor(name) {
 }
 function tabId(name) { return 'nav-' + name.replace(/\W/g, '_'); }
 
-// ── Discover sheet tabs ───────────────────────────────────────────────────────
-// Fetches the spreadsheet HTML page and parses sheet names from it.
-async function discoverSheets() {
-  const url = `https://docs.google.com/spreadsheets/d/${FILE_ID}/pubhtml`;
-  const res  = await fetch(url);
-  if (!res.ok) throw new Error(`Could not reach spreadsheet (HTTP ${res.status})`);
-  const html = await res.text();
-  // Sheet names appear in <li id="sheet-button-..."> or in data-sheet-id spans
-  const names = [];
-  // Try: <li ... id="sheet-button-..."><a ...>Sheet Name</a>
-  const liRe = /<li[^>]*id="sheet-button[^"]*"[^>]*>\s*<a[^>]*>([^<]+)<\/a>/gi;
-  let m;
-  while ((m = liRe.exec(html)) !== null) names.push(m[1].trim());
-  if (names.length) return names;
-  // Fallback: look for data-sheet-index spans used in newer pubhtml
-  const spanRe = /<span[^>]*class="[^"]*goog-inline-block[^"]*"[^>]*>([^<]+)<\/span>/gi;
-  const candidates = [];
-  while ((m = spanRe.exec(html)) !== null) {
-    const t = m[1].trim();
-    if (t && !t.startsWith('<') && t.length < 60) candidates.push(t);
-  }
-  // De-duplicate while preserving order
-  const seen = new Set();
-  for (const c of candidates) { if (!seen.has(c)) { seen.add(c); names.push(c); } }
-  return names;
+// ── JSONP helper — bypasses CORS for Google gviz endpoint ────────────────────
+let _jsonpCounter = 0;
+function jsonpFetch(url, callbackParam) {
+  return new Promise((resolve, reject) => {
+    const cbName = '__gvizCb_' + (_jsonpCounter++);
+    const script = document.createElement('script');
+    const timer  = setTimeout(() => {
+      cleanup();
+      reject(new Error('Request timed out'));
+    }, 12000);
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cbName] = function(data) { cleanup(); resolve(data); };
+    script.onerror = () => { cleanup(); reject(new Error('Script load failed')); };
+    script.src = url + (url.includes('?') ? '&' : '?') + callbackParam + '=' + cbName;
+    document.head.appendChild(script);
+  });
 }
 
-// ── Fetch one sheet's data ────────────────────────────────────────────────────
-async function fetchSheet(name) {
+// ── Discover sheet tabs via gviz (sheet index 0..N until error) ───────────────
+async function discoverSheets() {
+  // Try to load sheets by gid index; gviz returns an error table when gid doesn't exist.
+  // We also probe by known fallback names if that fails.
+  // Primary strategy: use the Sheets API JSON export to get sheet names
+  const feedUrl = `https://spreadsheets.google.com/feeds/worksheets/${FILE_ID}/public/basic?alt=json`;
+  try {
+    const data = await jsonpFetch(feedUrl, 'callback');
+    if (data && data.feed && data.feed.entry) {
+      return data.feed.entry.map(e => e.title.$t);
+    }
+  } catch(e) { /* fall through */ }
+  return []; // caller will use fallback names
+}
+
+// ── Fetch one sheet's data via JSONP (no CORS issues) ────────────────────────
+function fetchSheet(name) {
   const url = `https://docs.google.com/spreadsheets/d/${FILE_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(name)}`;
-  const res  = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const text  = await res.text();
-  const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
-  if (!match) throw new Error('Unexpected response format');
-  const json  = JSON.parse(match[1]);
-  if (!json.table) throw new Error('Empty table');
-  // Read column headers exactly as they appear in the sheet
-  const cols = json.table.cols.map(c => (c.label || c.id || '').trim()).filter(Boolean);
-  const rows = (json.table.rows || [])
-    .map(r => {
-      const obj = {};
-      if (r && r.c) r.c.forEach((cell, i) => {
-        if (cols[i] !== undefined) obj[cols[i]] = cell ? cell.v : null;
-      });
-      return obj;
-    })
-    .filter(r => Object.values(r).some(v => v !== null && v !== ''));
-  return { cols, rows };
+  return new Promise((resolve, reject) => {
+    const cbName = '__gvizCb_' + (_jsonpCounter++);
+    const script = document.createElement('script');
+    const timer  = setTimeout(() => {
+      cleanup();
+      reject(new Error('Request timed out'));
+    }, 12000);
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cbName] = function(raw) {
+      cleanup();
+      try {
+        const json = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+        if (!json || !json.table) return reject(new Error('Empty table'));
+        const cols = json.table.cols.map(c => (c.label || c.id || '').trim()).filter(Boolean);
+        const rows = (json.table.rows || [])
+          .map(r => {
+            const obj = {};
+            if (r && r.c) r.c.forEach((cell, i) => {
+              if (cols[i] !== undefined) obj[cols[i]] = cell ? cell.v : null;
+            });
+            return obj;
+          })
+          .filter(r => Object.values(r).some(v => v !== null && v !== ''));
+        resolve({ cols, rows });
+      } catch(e) { reject(e); }
+    };
+    script.onerror = () => { cleanup(); reject(new Error('Script load failed — check sheet sharing')); };
+    // tqx=out:json;responseHandler:cbName tells gviz to call our function
+    script.src = `https://docs.google.com/spreadsheets/d/${FILE_ID}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=${encodeURIComponent(name)}`;
+    document.head.appendChild(script);
+  });
 }
 
 // ── Load everything ───────────────────────────────────────────────────────────
@@ -334,7 +360,7 @@ async function loadAllData() {
       'Updated ' + new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
 
     activeTab = '__overview__';
-    renderTab('__overview__');
+    switchTab('__overview__');
 
   } catch (err) {
     document.getElementById('loading-state').classList.add('hidden');
