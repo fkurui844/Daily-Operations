@@ -311,9 +311,8 @@ function getFilterWindow() {
   const now   = new Date();
   const sysToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  // For relative presets, anchor to the latest date found across all loaded sheets
-  // so "Last 7 Days" means the 7 days ending at the most recent data point —
-  // not today's system date (which may be ahead of the data).
+  // For relative presets, anchor to the latest date found across all loaded sheets,
+  // capped at today so future-dated rows (typos, formulas) don't skew the window.
   function latestDataDate() {
     let latest = null;
     Object.values(allData).forEach(({ cols, rows }) => {
@@ -323,6 +322,7 @@ function getFilterWindow() {
         const d = parseRowDate(r[dateCol]);
         if (!d) return;
         const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        if (day > sysToday) return; // ignore future-dated rows
         if (!latest || day > latest) latest = day;
       });
     });
