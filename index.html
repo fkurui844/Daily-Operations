@@ -522,13 +522,24 @@ function setFilterPreset(preset) {
   switchTab(activeTab);
 }
 
+// Parse a YYYY-MM-DD string as LOCAL midnight (not UTC).
+// new Date('2026-05-28') gives UTC midnight = 03:00 in Nairobi (UTC+3),
+// so day comparisons can exclude the selected day entirely.
+// Parsing manually as local midnight fixes this for all timezones east of UTC.
+function parseDateInputAsLocal(str) {
+  if (!str) return null;
+  const parts = str.split('-');
+  if (parts.length !== 3) return new Date(str);
+  return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+}
+
 // Apply custom date range from inputs
 function applyCustomFilter() {
   const fromVal = document.getElementById('filter-from') ? document.getElementById('filter-from').value : '';
   const toVal   = document.getElementById('filter-to')   ? document.getElementById('filter-to').value   : '';
   dateFilter.preset = 'custom';
-  dateFilter.from = fromVal ? new Date(fromVal) : null;
-  dateFilter.to   = toVal  ? new Date(toVal)   : null;
+  dateFilter.from = parseDateInputAsLocal(fromVal);
+  dateFilter.to   = parseDateInputAsLocal(toVal);
   tableShown = {};
   switchTab(activeTab);
 }
