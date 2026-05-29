@@ -937,21 +937,42 @@ function parseRowDate(v) {
   return null;
 }
 
-// Returns rows for the latest day and the previous day, plus labels
+// Returns rows for the latest day and the previous day, plus labels.
+// Skips days where every numeric cell is 0 or null (e.g. a date row with no data yet).
 function getLatestRows(rows, dateCol) {
   const fallback = { today: rows.slice(-1), prev: rows.slice(-2,-1), latestDate: null, label: 'Latest', prevLabel: 'Previous' };
   if (!dateCol) return fallback;
   const dated = rows.map(r => ({ row: r, d: parseRowDate(r[dateCol]) })).filter(x => x.d);
   if (!dated.length) return fallback;
   dated.sort((a, b) => b.d - a.d);
-  const latestDate = dated[0].d;
-  const latestKey  = latestDate.toDateString();
-  const todayRows  = dated.filter(x => x.d.toDateString() === latestKey).map(x => x.row);
-  const rest       = dated.filter(x => x.d.toDateString() !== latestKey);
-  const prevKey    = rest.length ? rest[0].d.toDateString() : null;
-  const prevRows   = prevKey ? rest.filter(x => x.d.toDateString() === prevKey).map(x => x.row) : [];
+
+  // Group by date string
+  const byDate = [];
+  dated.forEach(({ row, d }) => {
+    const key = d.toDateString();
+    let grp = byDate.find(g => g.key === key);
+    if (!grp) { grp = { key, d, rows: [] }; byDate.push(grp); }
+    grp.rows.push(row);
+  });
+
+  // Find the most recent group that has at least one non-zero numeric value
+  function hasRealData(grpRows) {
+    return grpRows.some(r =>
+      Object.values(r).some(v => typeof v === 'number' && v !== 0 && !isNaN(v))
+    );
+  }
+
+  const latestGrp = byDate.find(g => hasRealData(g.rows)) || byDate[0];
+  const prevGrp   = byDate.find(g => g.key !== latestGrp.key && hasRealData(g.rows)) || byDate.find(g => g.key !== latestGrp.key);
+
   const fd = d => d.toLocaleDateString('en-KE', { weekday:'short', day:'numeric', month:'short' });
-  return { today: todayRows, prev: prevRows, latestDate, label: fd(latestDate), prevLabel: prevKey ? fd(new Date(prevKey)) : '—' };
+  return {
+    today:      latestGrp.rows,
+    prev:       prevGrp ? prevGrp.rows : [],
+    latestDate: latestGrp.d,
+    label:      fd(latestGrp.d),
+    prevLabel:  prevGrp ? fd(prevGrp.d) : '—',
+  };
 }
 
 function pct(a, b) { if (!b) return null; return ((a - b) / Math.abs(b)) * 100; }
