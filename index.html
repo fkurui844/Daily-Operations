@@ -937,7 +937,12 @@ function parseRowDate(v) {
   return null;
 }
 
-// Returns rows for the latest day and the previous day, plus labels.
+// Returns rows for the target day and the previous day, plus labels.
+// • When no date filter is active (preset === 'all'):  anchors to TODAY's actual
+//   system date.  If no data exists for today, falls back to the latest available
+//   date in the data so the cards are never empty.
+// • When a filter is active: uses the latest date inside the filtered window,
+//   exactly as the user requested.
 // Skips days where every numeric cell is 0 or null (e.g. a date row with no data yet).
 function getLatestRows(rows, dateCol) {
   const fallback = { today: rows.slice(-1), prev: rows.slice(-2,-1), latestDate: null, label: 'Latest', prevLabel: 'Previous' };
@@ -955,23 +960,47 @@ function getLatestRows(rows, dateCol) {
     grp.rows.push(row);
   });
 
-  // Find the most recent group that has at least one non-zero numeric value
+  // Find a group that has at least one non-zero numeric value
   function hasRealData(grpRows) {
     return grpRows.some(r =>
       Object.values(r).some(v => typeof v === 'number' && v !== 0 && !isNaN(v))
     );
   }
 
-  const latestGrp = byDate.find(g => hasRealData(g.rows)) || byDate[0];
-  const prevGrp   = byDate.find(g => g.key !== latestGrp.key && hasRealData(g.rows)) || byDate.find(g => g.key !== latestGrp.key);
+  let latestGrp;
+  let todayMissing = false; // true when today has no data yet (no-filter mode only)
+
+  if (dateFilter.preset === 'all') {
+    // ── No filter: try to show TODAY first ───────────────────────────────────
+    const sysToday = new Date();
+    sysToday.setHours(0, 0, 0, 0);
+    const todayKey = sysToday.toDateString();
+
+    const todayGrp = byDate.find(g => g.key === todayKey);
+    if (todayGrp && hasRealData(todayGrp.rows)) {
+      // Today's data exists and has real values — use it
+      latestGrp = todayGrp;
+    } else {
+      // Today has no data yet — flag it and fall back to latest available date
+      todayMissing = true;
+      latestGrp = byDate.find(g => hasRealData(g.rows)) || byDate[0];
+    }
+  } else {
+    // ── Filter active: use latest date inside the filtered window ─────────────
+    latestGrp = byDate.find(g => hasRealData(g.rows)) || byDate[0];
+  }
+
+  const prevGrp = byDate.find(g => g.key !== latestGrp.key && hasRealData(g.rows))
+               || byDate.find(g => g.key !== latestGrp.key);
 
   const fd = d => d.toLocaleDateString('en-KE', { weekday:'short', day:'numeric', month:'short' });
   return {
-    today:      latestGrp.rows,
-    prev:       prevGrp ? prevGrp.rows : [],
-    latestDate: latestGrp.d,
-    label:      fd(latestGrp.d),
-    prevLabel:  prevGrp ? fd(prevGrp.d) : '—',
+    today:        latestGrp.rows,
+    prev:         prevGrp ? prevGrp.rows : [],
+    latestDate:   latestGrp.d,
+    label:        fd(latestGrp.d),
+    prevLabel:    prevGrp ? fd(prevGrp.d) : '—',
+    todayMissing, // true → today's row not in sheet yet
   };
 }
 
@@ -1057,6 +1086,7 @@ function renderOverview(container) {
       .snap-ltr   { color:#2d6a4f; }
       .snap-credit{ color:#6b3fa0; }
       .snap-cash  { color:#0e6655; }
+      .snap-pending { font-size:10px; font-weight:600; color:#b5460f; background:#fef3ec; border-bottom:1px solid #f5d4b8; padding:5px 12px; display:flex; align-items:center; gap:5px; letter-spacing:.01em; }
 
       /* ─── summary scorecard ──────────────────── */
       .score-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:.5rem; }
@@ -1130,7 +1160,10 @@ function renderOverview(container) {
   // SECTION 1 — PER-DEPARTMENT DAILY SNAPSHOT CARDS
   // Each card shows exactly what management needs from that department today
   // ═══════════════════════════════════════════════════════════════════════════
-  const sec1 = document.createElement('div'); sec1.className = 'ov-sec'; sec1.textContent = "Today's Department Snapshots";
+  const sec1 = document.createElement('div'); sec1.className = 'ov-sec';
+  sec1.textContent = dateFilter.preset === 'all'
+    ? "Today's Department Snapshots"
+    : `Department Snapshots · ${filterDescription() || 'Filtered Period'}`;
   container.appendChild(sec1);
 
   const snapStrip = document.createElement('div');
@@ -1144,7 +1177,7 @@ function renderOverview(container) {
     const nums    = getNumCols(cols, rawRows);
     const dateCol = getDateCol(cols, rawRows);
     const rows = applyDateFilter(rawRows, dateCol);
-    const { today: todayRows, prev: prevRows, label, prevLabel } = getLatestRows(rows, dateCol);
+    const { today: todayRows, prev: prevRows, label, prevLabel, todayMissing } = getLatestRows(rows, dateCol);
     const n  = name.toLowerCase();
 
     const card = document.createElement('div');
@@ -1157,11 +1190,13 @@ function renderOverview(container) {
     card.innerHTML = `
       <div class="snap-head">
         <div class="snap-dept" style="color:${color.main}">${name}</div>
-        <div class="snap-date">Latest: ${label}${prevLabel && prevLabel !== '—' ? ' · Prev: ' + prevLabel : ''}</div>
-      </div>`;
+        <div class="snap-date">${dateFilter.preset === 'all' ? 'Latest' : 'Period'}: ${label}${prevLabel && prevLabel !== '—' ? ' · Prev: ' + prevLabel : ''}</div>
+      </div>
+      ${todayMissing ? `<div class="snap-pending">⏳ Yet to be updated today</div>` : ''}`;
 
     const body = document.createElement('div');
     body.className = 'snap-body';
+    if (todayMissing) body.style.opacity = '0.45';
 
     // ── MILK INTAKE ──────────────────────────────────────────────────────────
     if (n.includes('milk') || n.includes('intake')) {
