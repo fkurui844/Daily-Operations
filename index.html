@@ -795,6 +795,21 @@ function detectUnit(sheetName, colName) {
 }
 
 // ── Formatting ───────────────────────────────────────────────────────────────
+// ── Chart label formatter ─────────────────────────────────────────────────────
+// Converts raw gviz "Date(2026,4,28)" strings, JS Dates, or plain strings
+// into a short DD/MM/YY label for chart axes.
+function fmtChartLabel(v) {
+  if (v == null) return '';
+  const d = parseRowDate(v);
+  if (d) {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yy = String(d.getFullYear()).slice(-2);
+    return dd + '/' + mm + '/' + yy;
+  }
+  return String(v).substring(0, 10);
+}
+
 function fmt(v, dp) {
   if (v == null || isNaN(v)) return '—';
   return Number(v).toLocaleString('en-KE', { maximumFractionDigits: dp ?? 0, minimumFractionDigits: 0 });
@@ -2327,7 +2342,7 @@ function renderSheet(name, sheet, container) {
         chartInst[barId] = new Chart(bc, {
           type: 'bar',
           data: {
-            labels: sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 14) : ''),
+            labels: sliced.map(r => fmtChartLabel(r[labelCol])),
             datasets: [{ label: primaryCol, data: sliced.map(r => typeof r[primaryCol] === 'number' ? r[primaryCol] : 0), backgroundColor: color.main + 'cc', borderColor: color.main, borderWidth: 1, borderRadius: 4 }]
           },
           options: {
@@ -2384,7 +2399,7 @@ function renderSheet(name, sheet, container) {
         lineCard.appendChild(lw);
         chartsRow.appendChild(lineCard);
 
-        const labels2 = sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : '');
+        const labels2 = sliced.map(r => fmtChartLabel(r[labelCol]));
         const volData  = sliced.map(r => typeof r[volCol2] === 'number' ? r[volCol2] : 0);
         const kesData  = sliced.map(r => typeof r[kesCol2] === 'number' ? r[kesCol2] : 0);
 
@@ -2478,7 +2493,7 @@ function renderSheet(name, sheet, container) {
         lineCard.appendChild(lw);
         chartsRow.appendChild(lineCard);
 
-        const labels4 = sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : '');
+        const labels4 = sliced.map(r => fmtChartLabel(r[labelCol]));
         const stDatasets = stationCols2.map((col, i) => ({
           label: col + ' (L)',
           data: sliced.map(r => typeof r[col] === 'number' ? r[col] : 0),
@@ -2555,7 +2570,7 @@ function renderSheet(name, sheet, container) {
         lineCard.appendChild(lw);
         chartsRow.appendChild(lineCard);
 
-        const labels3    = sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : '');
+        const labels3    = sliced.map(r => fmtChartLabel(r[labelCol]));
         const cashData   = sliced.map(r => cashCol2   && typeof r[cashCol2]   === 'number' ? r[cashCol2]   : 0);
         const creditData = sliced.map(r => creditCol2 && typeof r[creditCol2] === 'number' ? r[creditCol2] : 0);
         const totalData  = sliced.map(r => totalCol2  && typeof r[totalCol2]  === 'number' ? r[totalCol2]  : 0);
@@ -2614,7 +2629,7 @@ function renderSheet(name, sheet, container) {
           chartInst[lineId] = new Chart(lc, {
             type: 'line',
             data: {
-              labels: sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : ''),
+              labels: sliced.map(r => fmtChartLabel(r[labelCol])),
               datasets: nums.map((col, i) => {
                 const u = detectUnit(name, col);
                 return { label: col + (u ? ' (' + u + ')' : ''), data: sliced.map(r => typeof r[col] === 'number' ? r[col] : 0), borderColor: palette[i], backgroundColor: 'transparent', borderWidth: 2, tension: 0.3, pointRadius: 3, borderDash: i % 2 === 1 ? [4,3] : [] };
