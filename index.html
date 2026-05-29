@@ -1192,7 +1192,7 @@ function renderOverview(container) {
         <div class="snap-dept" style="color:${color.main}">${name}</div>
         <div class="snap-date">${dateFilter.preset === 'all' ? 'Latest' : 'Period'}: ${label}${prevLabel && prevLabel !== '—' ? ' · Prev: ' + prevLabel : ''}</div>
       </div>
-      ${todayMissing ? `<div class="snap-pending">⏳ Yet to be updated today</div>` : ''}`;
+      ${todayMissing ? `<div class="snap-pending">Yet to be updated today</div>` : ''}`;
 
     const body = document.createElement('div');
     body.className = 'snap-body';
