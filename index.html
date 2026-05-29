@@ -404,15 +404,10 @@ function destroyCharts() {
   chartInst = {};
 }
 
-// ── Overview helpers ──────────────────────────────────────────────────────────
+// ── Date helpers ──────────────────────────────────────────────────────────────
 function getDateCol(cols, rows) {
-  // Find a column that looks like a date column
-  const dateLike = cols.find(c => {
-    const s = c.toLowerCase();
-    return /\b(date|day|period|week|month)\b/.test(s);
-  });
+  const dateLike = cols.find(c => /\b(date|day|period|week|month)\b/i.test(c));
   if (dateLike) return dateLike;
-  // Fallback: first column where values look like dates (JS Date objects or parseable strings)
   return cols.find(c => rows.some(r => {
     const v = r[c];
     if (v instanceof Date) return true;
@@ -429,213 +424,401 @@ function parseRowDate(v) {
   return null;
 }
 
+// Returns rows for the latest day and the previous day, plus labels
 function getLatestRows(rows, dateCol) {
-  if (!dateCol) return { today: rows.slice(-1), prev: rows.slice(-2, -1), label: 'Latest entry', prevLabel: 'Previous entry' };
+  const fallback = { today: rows.slice(-1), prev: rows.slice(-2,-1), latestDate: null, label: 'Latest', prevLabel: 'Previous' };
+  if (!dateCol) return fallback;
   const dated = rows.map(r => ({ row: r, d: parseRowDate(r[dateCol]) })).filter(x => x.d);
-  if (!dated.length) return { today: rows.slice(-1), prev: rows.slice(-2, -1), label: 'Latest entry', prevLabel: 'Previous entry' };
+  if (!dated.length) return fallback;
   dated.sort((a, b) => b.d - a.d);
   const latestDate = dated[0].d;
-  const latestDay  = latestDate.toDateString();
-  const todayRows  = dated.filter(x => x.d.toDateString() === latestDay).map(x => x.row);
-  // Previous day
-  const prevDated  = dated.filter(x => x.d.toDateString() !== latestDay);
-  const prevDay    = prevDated.length ? prevDated[0].d.toDateString() : null;
-  const prevRows   = prevDay ? prevDated.filter(x => x.d.toDateString() === prevDay).map(x => x.row) : [];
-  const fmtDay = d => d ? new Date(d).toLocaleDateString('en-KE', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
-  return { today: todayRows, prev: prevRows, label: fmtDay(latestDate), prevLabel: fmtDay(prevDay ? new Date(prevDay) : null) };
+  const latestKey  = latestDate.toDateString();
+  const todayRows  = dated.filter(x => x.d.toDateString() === latestKey).map(x => x.row);
+  const rest       = dated.filter(x => x.d.toDateString() !== latestKey);
+  const prevKey    = rest.length ? rest[0].d.toDateString() : null;
+  const prevRows   = prevKey ? rest.filter(x => x.d.toDateString() === prevKey).map(x => x.row) : [];
+  const fd = d => d.toLocaleDateString('en-KE', { weekday:'short', day:'numeric', month:'short' });
+  return { today: todayRows, prev: prevRows, latestDate, label: fd(latestDate), prevLabel: prevKey ? fd(new Date(prevKey)) : '—' };
 }
 
 function pct(a, b) { if (!b) return null; return ((a - b) / Math.abs(b)) * 100; }
 
-function trendArrow(p) {
-  if (p === null) return { icon: '—', cls: 'trend-flat', text: 'n/a' };
-  if (p > 5)  return { icon: '↑', cls: 'trend-up',   text: '+' + p.toFixed(1) + '%' };
-  if (p < -5) return { icon: '↓', cls: 'trend-down', text: p.toFixed(1) + '%' };
-  return { icon: '→', cls: 'trend-flat', text: (p > 0 ? '+' : '') + p.toFixed(1) + '%' };
+function trendBadge(p, reverse) {
+  if (p === null) return `<span class="tb-flat">— n/a</span>`;
+  const good = reverse ? p < -5 : p > 5;
+  const bad  = reverse ? p > 5  : p < -5;
+  const txt  = (p > 0 ? '+' : '') + p.toFixed(1) + '%';
+  if (good) return `<span class="tb-up">▲ ${txt}</span>`;
+  if (bad)  return `<span class="tb-dn">▼ ${txt}</span>`;
+  return `<span class="tb-flat">→ ${txt}</span>`;
 }
 
-// Get last N days of daily totals for a sparkline
-function getDailyTotals(rows, dateCol, valueCol, n) {
-  if (!dateCol) {
-    return rows.slice(-n).map((r, i) => ({ label: String(i + 1), val: typeof r[valueCol] === 'number' ? r[valueCol] : 0 }));
+// Sum a column for a set of rows
+function sumCol(rows, col) {
+  return rows.reduce((s, r) => s + (typeof r[col] === 'number' ? r[col] : 0), 0);
+}
+
+// Find column by keyword patterns in name
+function findCol(cols, patterns) {
+  for (const pat of patterns) {
+    const re = new RegExp(pat, 'i');
+    const c = cols.find(c => re.test(c));
+    if (c) return c;
   }
-  const dated = rows.map(r => ({ val: typeof r[valueCol] === 'number' ? r[valueCol] : 0, d: parseRowDate(r[dateCol]) })).filter(x => x.d);
+  return null;
+}
+
+// Get last N days aggregated data: [{label, vals:{col: total}}]
+function getDailyAgg(rows, dateCol, valueCols, n) {
   const byDay = {};
-  dated.forEach(({ val, d }) => {
-    const key = d.toDateString();
-    byDay[key] = (byDay[key] || { d, total: 0 });
-    byDay[key].total += val;
+  rows.forEach(r => {
+    const d = dateCol ? parseRowDate(r[dateCol]) : null;
+    const key = d ? d.toDateString() : '__single__';
+    if (!byDay[key]) byDay[key] = { d: d || new Date(0), totals: {} };
+    valueCols.forEach(col => {
+      byDay[key].totals[col] = (byDay[key].totals[col] || 0) + (typeof r[col] === 'number' ? r[col] : 0);
+    });
   });
-  const days = Object.values(byDay).sort((a, b) => a.d - b.d).slice(-n);
-  return days.map(x => ({ label: x.d.toLocaleDateString('en-KE', { day: 'numeric', month: 'short' }), val: x.total }));
+  return Object.values(byDay)
+    .sort((a, b) => a.d - b.d)
+    .slice(-n)
+    .map(x => ({
+      label: x.d.getFullYear() > 1970 ? x.d.toLocaleDateString('en-KE', { day:'numeric', month:'short' }) : 'Entry',
+      totals: x.totals,
+      d: x.d
+    }));
 }
 
 // ── Overview ──────────────────────────────────────────────────────────────────
 function renderOverview(container) {
   container.classList.add('fade-in');
 
-  // ── Extra CSS injected once
+  // Inject styles once
   if (!document.getElementById('ov-styles')) {
     const s = document.createElement('style');
     s.id = 'ov-styles';
     s.textContent = `
-      .ov-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); margin: 1.5rem 0 0.75rem; }
-      .ov-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 0.5rem; }
-      .ov-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.1rem 1.25rem; cursor: pointer; transition: box-shadow 0.15s; }
-      .ov-kpi:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
-      .ov-kpi-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 4px; }
-      .ov-kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
-      .ov-kpi-sheet { font-size: 10px; color: var(--text-faint); margin-top: 1px; }
-      .ov-kpi-value { font-size: 26px; font-weight: 700; letter-spacing: -1px; line-height: 1.1; margin: 6px 0 4px; }
-      .ov-kpi-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
-      .trend-up   { color: #1a7f4b; background: #d8f3dc; padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-      .trend-down { color: #a0402a; background: #fde0d8; padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-      .trend-flat { color: #7a7268; background: #f0ede8; padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-      .ov-kpi-prev { font-size: 11px; color: var(--text-faint); }
-      .ov-kpi-bar { height: 3px; border-radius: 2px; margin-top: 10px; background: var(--border); overflow: hidden; }
-      .ov-kpi-bar-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+      /* ─── layout ─────────────────────────────── */
+      .ov-sec { margin: 1.4rem 0 0.7rem; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:var(--text-faint); display:flex; align-items:center; gap:8px; }
+      .ov-sec::after { content:''; flex:1; height:1px; background:var(--border); }
 
-      .ov-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
-      @media (max-width: 900px) { .ov-two-col { grid-template-columns: 1fr; } }
+      /* ─── trend badges ───────────────────────── */
+      .tb-up   { background:#d8f3dc; color:#1a7f4b; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap; }
+      .tb-dn   { background:#fde0d8; color:#a0402a; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap; }
+      .tb-flat { background:#f0ede8; color:#7a7268; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap; }
 
-      .ov-three-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+      /* ─── daily snapshot strip ───────────────── */
+      .snap-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin-bottom:.5rem; }
+      .snap-card  { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; }
+      .snap-head  { padding:.75rem 1rem .5rem; border-bottom:1px solid var(--border); }
+      .snap-dept  { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+      .snap-date  { font-size:10px; color:var(--text-faint); margin-top:1px; }
+      .snap-body  { padding:.6rem 1rem .8rem; display:flex; flex-direction:column; gap:6px; }
+      .snap-row   { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+      .snap-lbl   { font-size:11px; color:var(--text-muted); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .snap-val   { font-size:15px; font-weight:700; letter-spacing:-.4px; font-family:'DM Mono',monospace; white-space:nowrap; }
+      .snap-sub   { font-size:10px; color:var(--text-faint); text-align:right; white-space:nowrap; }
+      .snap-divider { height:1px; background:var(--border); margin:2px 0; }
+      .snap-ksh   { color:#1b4f72; }
+      .snap-ltr   { color:#2d6a4f; }
+      .snap-credit{ color:#6b3fa0; }
+      .snap-cash  { color:#0e6655; }
 
-      .ov-alert { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-radius: 10px; margin-bottom: 8px; font-size: 13px; }
-      .ov-alert-warn { background: #fef9ec; border: 1px solid #f5d97a; }
-      .ov-alert-good { background: #f0faf4; border: 1px solid #a8daba; }
-      .ov-alert-info { background: #f0f4ff; border: 1px solid #b3c5f5; }
-      .ov-alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
-      .ov-alert-text { flex: 1; }
-      .ov-alert-title { font-weight: 600; margin-bottom: 1px; }
-      .ov-alert-sub { color: var(--text-muted); font-size: 12px; }
+      /* ─── summary scorecard ──────────────────── */
+      .score-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:.5rem; }
+      .score-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:.9rem 1.1rem; cursor:pointer; transition:box-shadow .15s; }
+      .score-card:hover { box-shadow:0 3px 14px rgba(0,0,0,.08); }
+      .score-top  { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; }
+      .score-lbl  { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); }
+      .score-val  { font-size:22px; font-weight:700; letter-spacing:-.8px; line-height:1.1; margin-bottom:3px; }
+      .score-foot { display:flex; justify-content:space-between; align-items:center; margin-top:5px; }
+      .score-prev { font-size:10px; color:var(--text-faint); }
+      .score-bar  { height:3px; border-radius:2px; background:var(--border); overflow:hidden; margin-top:8px; }
+      .score-fill { height:100%; border-radius:2px; }
 
-      .perf-table { width: 100%; font-size: 12px; border-collapse: collapse; }
-      .perf-table th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); padding: 0 6px 6px; text-align: left; }
-      .perf-table td { padding: 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-      .perf-table tr:last-child td { border-bottom: none; }
-      .perf-bar-wrap { background: var(--border); border-radius: 3px; height: 6px; width: 80px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
-      .perf-bar-fill { height: 100%; border-radius: 3px; }
-      .rank-num { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; background: var(--bg); color: var(--text-muted); flex-shrink: 0; }
-      .rank-1 { background: #fde8a0; color: #7a5c00; }
-      .rank-2 { background: #e8e8e8; color: #555; }
-      .rank-3 { background: #fce0cc; color: #7a3a1a; }
+      /* ─── 14-day trend charts ────────────────── */
+      .trend-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1rem; margin-bottom:.5rem; }
+
+      /* ─── alerts ─────────────────────────────── */
+      .alert-row  { display:flex; align-items:flex-start; gap:10px; padding:9px 14px; border-radius:10px; margin-bottom:7px; font-size:13px; }
+      .alert-warn { background:#fef9ec; border:1px solid #f5d97a; }
+      .alert-good { background:#f0faf4; border:1px solid #a8daba; }
+      .alert-icon { font-size:15px; flex-shrink:0; margin-top:1px; }
+      .alert-body { flex:1; }
+      .alert-ttl  { font-weight:600; margin-bottom:1px; }
+      .alert-sub  { font-size:11px; color:var(--text-muted); }
+
+      /* ─── drill-down bar ─────────────────────── */
+      .dd-bar { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; background:var(--surface); margin-bottom:.5rem; }
+      .dd-cell{ padding:.85rem 1.1rem; border-right:1px solid var(--border); cursor:pointer; transition:background .12s; }
+      .dd-cell:last-child { border-right:none; }
+      .dd-cell:hover { background:var(--bg); }
+      .dd-lbl { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; margin-bottom:3px; }
+      .dd-val { font-size:17px; font-weight:700; letter-spacing:-.5px; }
+      .dd-sub { font-size:10px; color:var(--text-muted); margin-top:2px; }
     `;
     document.head.appendChild(s);
   }
 
-  const today = new Date().toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-
+  // ── current date display
+  const todayStr = new Date().toLocaleDateString('en-KE', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   container.innerHTML = `
-    <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+    <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:1.1rem;">
       <div>
-        <div class="page-title">Daily Performance Overview</div>
-        <div class="page-subtitle">${today} · ${sheetMeta.length} department${sheetMeta.length !== 1 ? 's' : ''} · live data</div>
+        <div class="page-title">Daily Operations Overview</div>
+        <div class="page-subtitle">${todayStr} · ${sheetMeta.length} departments · live data</div>
       </div>
-      <button class="btn btn-primary" onclick="loadAllData()" style="margin-top:4px;">↻ Refresh</button>
+      <button class="btn btn-primary" onclick="loadAllData()">↻ Refresh</button>
     </div>`;
 
-  // ── 1. KPI Cards (today vs previous period) ────────────────────────────────
-  const kpiTitle = document.createElement('div');
-  kpiTitle.className = 'ov-section-title';
-  kpiTitle.textContent = '📊 Key Performance Indicators — Latest vs Previous Period';
-  container.appendChild(kpiTitle);
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 1 — PER-DEPARTMENT DAILY SNAPSHOT CARDS
+  // Each card shows exactly what management needs from that department today
+  // ═══════════════════════════════════════════════════════════════════════════
+  const sec1 = document.createElement('div'); sec1.className = 'ov-sec'; sec1.textContent = "Today's Department Snapshots";
+  container.appendChild(sec1);
 
-  const kpiGrid = document.createElement('div');
-  kpiGrid.className = 'ov-kpi-grid';
+  const snapStrip = document.createElement('div');
+  snapStrip.className = 'snap-strip';
 
   const alerts = [];
+
+  sheetMeta.forEach(({ name, color }) => {
+    const sheet   = allData[name];
+    const { cols, rows } = sheet;
+    const nums    = getNumCols(cols, rows);
+    const dateCol = getDateCol(cols, rows);
+    const { today: todayRows, prev: prevRows, label, prevLabel } = getLatestRows(rows, dateCol);
+    const n  = name.toLowerCase();
+
+    const card = document.createElement('div');
+    card.className = 'snap-card';
+    card.style.borderTop = `3px solid ${color.main}`;
+    card.onclick = () => switchTab(name);
+    card.style.cursor = 'pointer';
+
+    // head
+    card.innerHTML = `
+      <div class="snap-head">
+        <div class="snap-dept" style="color:${color.main}">${name}</div>
+        <div class="snap-date">Latest: ${label}${prevLabel && prevLabel !== '—' ? ' · Prev: ' + prevLabel : ''}</div>
+      </div>`;
+
+    const body = document.createElement('div');
+    body.className = 'snap-body';
+
+    // ── MILK INTAKE ──────────────────────────────────────────────────────────
+    if (n.includes('milk') || n.includes('intake')) {
+      // Find total intake volume column
+      const totalCol  = findCol(cols, ['total','intake','received','collected','volume','eldoret','quantity','litr','ltr']) || nums[0];
+      const suppCols  = nums.filter(c => c !== totalCol).slice(0, 3); // supplier sub-columns
+
+      const todayTotal = totalCol ? sumCol(todayRows, totalCol) : sumCol(todayRows, nums[0]);
+      const prevTotal  = totalCol ? sumCol(prevRows,  totalCol) : sumCol(prevRows,  nums[0]);
+      const chg = pct(todayTotal, prevTotal);
+      if (chg !== null && chg < -15) alerts.push({ type:'warn', msg:`Milk intake down ${Math.abs(chg).toFixed(1)}% vs previous day`, sub:`${fmtU(todayTotal,'L')} vs ${fmtU(prevTotal,'L')}` });
+
+      body.innerHTML += `
+        <div class="snap-row">
+          <span class="snap-lbl">🥛 Total Milk Received</span>
+          ${trendBadge(chg)}
+        </div>
+        <div class="snap-row">
+          <span class="snap-val snap-ltr">${fmtU(todayTotal, 'L')}</span>
+          <span class="snap-sub">prev ${fmtU(prevTotal, 'L')}</span>
+        </div>`;
+
+      // Show individual supplier/station columns if any
+      suppCols.forEach(col => {
+        const v = sumCol(todayRows, col);
+        if (v > 0) body.innerHTML += `
+          <div class="snap-row" style="margin-top:1px;">
+            <span class="snap-lbl" style="font-size:10px;padding-left:8px;">↳ ${col}</span>
+            <span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text-muted)">${fmtU(v, 'L')}</span>
+          </div>`;
+      });
+
+    // ── PRODUCTION ───────────────────────────────────────────────────────────
+    } else if (n.includes('prod')) {
+      // Find production volume + other key production metrics
+      const volCol  = findCol(cols, ['production','produced','output','volume','litr','ltr','dispatch','packed']) || nums[0];
+      const bfCol   = findCol(cols, ['b/f','bf','balance.forward','opening','stock.b']);
+      const cfCol   = findCol(cols, ['c/f','cf','closing','carry.forward','stock.c']);
+      const intakeC = findCol(cols, ['intake','received','milk.in','input']);
+      const wastCol = findCol(cols, ['waste','loss','spoil','reject']);
+
+      const todayVol  = sumCol(todayRows, volCol);
+      const prevVol   = sumCol(prevRows,  volCol);
+      const chg = pct(todayVol, prevVol);
+      if (chg !== null && chg < -15) alerts.push({ type:'warn', msg:`Production output down ${Math.abs(chg).toFixed(1)}%`, sub:`${fmtU(todayVol,'L')} produced today` });
+
+      body.innerHTML += `
+        <div class="snap-row"><span class="snap-lbl">🏭 Production Output</span>${trendBadge(chg)}</div>
+        <div class="snap-row">
+          <span class="snap-val snap-ltr">${fmtU(todayVol, 'L')}</span>
+          <span class="snap-sub">prev ${fmtU(prevVol,'L')}</span>
+        </div>`;
+
+      if (bfCol) { const v = sumCol(todayRows,bfCol); body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">↳ Opening (B/F)</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text-muted)">${fmtU(v,'L')}</span></div>`; }
+      if (intakeC){ const v = sumCol(todayRows,intakeC); body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">↳ Milk In</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text-muted)">${fmtU(v,'L')}</span></div>`; }
+      if (cfCol)  { const v = sumCol(todayRows,cfCol);  body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">↳ Closing (C/F)</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text-muted)">${fmtU(v,'L')}</span></div>`; }
+      if (wastCol){ const v = sumCol(todayRows,wastCol); if(v>0) body.innerHTML += `<div class="snap-row"><span class="snap-lbl" style="font-size:10px;padding-left:8px;color:#a0402a;">↳ Waste/Loss</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:#a0402a">${fmtU(v,'L')}</span></div>`; }
+
+    // ── SALES ────────────────────────────────────────────────────────────────
+    } else if (n.includes('sale')) {
+      // Volume in litres
+      const volCol = findCol(cols, ['volume','litr','ltr','qty','quantity','sold.l','sales.l','dispatched']) || nums.find(c => detectUnit(name,c) === 'L');
+      // Revenue in KES
+      const kesCol = findCol(cols, ['amount','revenue','ksh','kes','value','total','income','sales.k','payment']) || nums.find(c => detectUnit(name,c) === 'KES');
+      // Any other numeric col not already used
+      const otherCols = nums.filter(c => c !== volCol && c !== kesCol).slice(0,2);
+
+      const todayVol = volCol ? sumCol(todayRows, volCol) : 0;
+      const prevVol  = volCol ? sumCol(prevRows,  volCol) : 0;
+      const todayKes = kesCol ? sumCol(todayRows, kesCol) : 0;
+      const prevKes  = kesCol ? sumCol(prevRows,  kesCol) : 0;
+      const chgV = pct(todayVol, prevVol);
+      const chgK = pct(todayKes, prevKes);
+
+      if (chgV !== null && chgV < -15) alerts.push({ type:'warn', msg:`Sales volume down ${Math.abs(chgV).toFixed(1)}%`, sub:`${fmtU(todayVol,'L')} sold today` });
+      if (chgK !== null && chgK > 20)  alerts.push({ type:'good', msg:`Sales revenue up ${chgK.toFixed(1)}%`, sub:`KES ${fmt(todayKes)} collected today` });
+
+      if (volCol) body.innerHTML += `
+        <div class="snap-row"><span class="snap-lbl">📦 Sales Volume</span>${trendBadge(chgV)}</div>
+        <div class="snap-row">
+          <span class="snap-val snap-ltr">${fmtU(todayVol,'L')}</span>
+          <span class="snap-sub">prev ${fmtU(prevVol,'L')}</span>
+        </div>`;
+
+      if (kesCol) {
+        body.innerHTML += `<div class="snap-divider"></div>`;
+        body.innerHTML += `
+          <div class="snap-row"><span class="snap-lbl">💰 Sales Revenue</span>${trendBadge(chgK)}</div>
+          <div class="snap-row">
+            <span class="snap-val snap-ksh">KES ${fmt(todayKes)}</span>
+            <span class="snap-sub">prev KES ${fmt(prevKes)}</span>
+          </div>`;
+      }
+
+      otherCols.forEach(col => {
+        const v = sumCol(todayRows,col), u = detectUnit(name,col);
+        if (v > 0) body.innerHTML += `<div class="snap-row" style="margin-top:1px;"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">↳ ${col}</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text-muted)">${fmtU(v,u)}</span></div>`;
+      });
+
+    // ── FINANCE ──────────────────────────────────────────────────────────────
+    } else if (n.includes('financ') || n.includes('payment') || n.includes('cash') || n.includes('credit')) {
+      const cashCol   = findCol(cols, ['cash','paid','payment','received.cash','cash.in']);
+      const creditCol = findCol(cols, ['credit','mpesa','cheque','invoice','debt','pending','receivable','credit.sale']);
+      const totalCol  = findCol(cols, ['total','amount','revenue','income','collection']) || nums[0];
+
+      const todayCash   = cashCol   ? sumCol(todayRows, cashCol)   : 0;
+      const prevCash    = cashCol   ? sumCol(prevRows,  cashCol)   : 0;
+      const todayCredit = creditCol ? sumCol(todayRows, creditCol) : 0;
+      const prevCredit  = creditCol ? sumCol(prevRows,  creditCol) : 0;
+      const todayTotal  = totalCol  ? sumCol(todayRows, totalCol)  : todayCash + todayCredit;
+      const prevTotal   = totalCol  ? sumCol(prevRows,  totalCol)  : prevCash  + prevCredit;
+      const chgT = pct(todayTotal, prevTotal);
+
+      if (chgT !== null && chgT < -20) alerts.push({ type:'warn', msg:`Finance collections down ${Math.abs(chgT).toFixed(1)}%`, sub:`KES ${fmt(todayTotal)} vs KES ${fmt(prevTotal)} previous` });
+
+      body.innerHTML += `
+        <div class="snap-row"><span class="snap-lbl">🏦 Total Received</span>${trendBadge(chgT)}</div>
+        <div class="snap-row">
+          <span class="snap-val snap-ksh">KES ${fmt(todayTotal)}</span>
+          <span class="snap-sub">prev KES ${fmt(prevTotal)}</span>
+        </div>`;
+
+      if (cashCol) {
+        const chgC = pct(todayCash, prevCash);
+        body.innerHTML += `<div class="snap-divider"></div>
+          <div class="snap-row"><span class="snap-lbl">💵 Cash Received</span>${trendBadge(chgC)}</div>
+          <div class="snap-row">
+            <span class="snap-val snap-cash">KES ${fmt(todayCash)}</span>
+            <span class="snap-sub">prev KES ${fmt(prevCash)}</span>
+          </div>`;
+      }
+
+      if (creditCol) {
+        const chgCr = pct(todayCredit, prevCredit);
+        body.innerHTML += `<div class="snap-divider"></div>
+          <div class="snap-row"><span class="snap-lbl">🧾 Credit / Receivable</span>${trendBadge(chgCr)}</div>
+          <div class="snap-row">
+            <span class="snap-val snap-credit">KES ${fmt(todayCredit)}</span>
+            <span class="snap-sub">prev KES ${fmt(prevCredit)}</span>
+          </div>`;
+      }
+
+      // Any other numeric cols not captured above
+      nums.filter(c => c !== cashCol && c !== creditCol && c !== totalCol).slice(0,2).forEach(col => {
+        const v = sumCol(todayRows,col), u = detectUnit(name,col);
+        if (v > 0) body.innerHTML += `<div class="snap-row" style="margin-top:1px;"><span class="snap-lbl" style="font-size:10px;padding-left:8px;">↳ ${col}</span><span style="font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text-muted)">${fmtU(v,u)}</span></div>`;
+      });
+
+    // ── FALLBACK for any other sheet ─────────────────────────────────────────
+    } else {
+      nums.slice(0, 4).forEach((col, i) => {
+        const unit = detectUnit(name, col);
+        const todayVal = sumCol(todayRows, col);
+        const prevVal  = sumCol(prevRows,  col);
+        const chg = pct(todayVal, prevVal);
+        if (i > 0) body.innerHTML += `<div class="snap-divider"></div>`;
+        body.innerHTML += `
+          <div class="snap-row"><span class="snap-lbl">${col}</span>${trendBadge(chg)}</div>
+          <div class="snap-row">
+            <span class="snap-val" style="color:${color.main}">${fmtU(todayVal, unit)}</span>
+            <span class="snap-sub">prev ${fmtU(prevVal, unit)}</span>
+          </div>`;
+      });
+    }
+
+    card.appendChild(body);
+    snapStrip.appendChild(card);
+  });
+  container.appendChild(snapStrip);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 2 — MANAGEMENT ALERTS
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (alerts.length) {
+    const sec2 = document.createElement('div'); sec2.className = 'ov-sec'; sec2.textContent = 'Management Alerts';
+    container.appendChild(sec2);
+    alerts.forEach(a => {
+      const div = document.createElement('div');
+      div.className = `alert-row alert-${a.type}`;
+      div.innerHTML = `<div class="alert-icon">${a.type === 'warn' ? '⚠️' : '✅'}</div>
+        <div class="alert-body"><div class="alert-ttl">${a.msg}</div><div class="alert-sub">${a.sub}</div></div>`;
+      container.appendChild(div);
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 3 — 14-DAY TREND CHARTS (primary metric per department)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const sec3 = document.createElement('div'); sec3.className = 'ov-sec'; sec3.textContent = '14-Day Trend — Primary Metric per Department';
+  container.appendChild(sec3);
+
+  const trendGrid = document.createElement('div');
+  trendGrid.className = 'trend-grid';
 
   sheetMeta.forEach(({ name, color }, si) => {
     const sheet   = allData[name];
     const nums    = getNumCols(sheet.cols, sheet.rows);
-    if (!nums.length) return;
-    const dateCol = getDateCol(sheet.cols, sheet.rows);
-    const { today: todayRows, prev: prevRows, label, prevLabel } = getLatestRows(sheet.rows, dateCol);
-
-    nums.slice(0, 3).forEach((col, ci) => {
-      const unit     = detectUnit(name, col);
-      const todayVal = todayRows.reduce((s, r) => s + (typeof r[col] === 'number' ? r[col] : 0), 0);
-      const prevVal  = prevRows.reduce((s, r) => s + (typeof r[col] === 'number' ? r[col] : 0), 0);
-      const change   = pct(todayVal, prevVal);
-      const trend    = trendArrow(change);
-      // Progress vs max ever
-      const allVals  = sheet.rows.map(r => typeof r[col] === 'number' ? r[col] : 0);
-      const maxVal   = Math.max(...allVals);
-      const pctOfMax = maxVal ? (todayVal / maxVal) * 100 : 0;
-
-      // Generate alerts
-      if (change !== null && change < -15) alerts.push({ type: 'warn', sheet: name, col, change, label });
-      if (change !== null && change > 20)  alerts.push({ type: 'good', sheet: name, col, change, label });
-
-      const card = document.createElement('div');
-      card.className = 'ov-kpi';
-      card.onclick   = () => switchTab(name);
-      card.style.borderTop = `3px solid ${color.main}`;
-      card.innerHTML = `
-        <div class="ov-kpi-top">
-          <div>
-            <div class="ov-kpi-label">${col}</div>
-            <div class="ov-kpi-sheet">${name}</div>
-          </div>
-          <span class="${trend.cls}">${trend.icon} ${trend.text}</span>
-        </div>
-        <div class="ov-kpi-value" style="color:${color.main}">${fmtU(todayVal, unit)}</div>
-        <div class="ov-kpi-footer">
-          <span class="ov-kpi-prev">Prev: ${fmtU(prevVal, unit) || '—'}</span>
-          <span style="font-size:11px;color:var(--text-faint)">${label}</span>
-        </div>
-        <div class="ov-kpi-bar"><div class="ov-kpi-bar-fill" style="width:${Math.min(pctOfMax,100)}%;background:${color.main}"></div></div>
-      `;
-      kpiGrid.appendChild(card);
-    });
-  });
-  container.appendChild(kpiGrid);
-
-  // ── 2. Alerts / Flags ─────────────────────────────────────────────────────
-  if (alerts.length) {
-    const aTitle = document.createElement('div');
-    aTitle.className = 'ov-section-title';
-    aTitle.textContent = '🚦 Management Alerts';
-    container.appendChild(aTitle);
-    const aWrap = document.createElement('div');
-    alerts.forEach(a => {
-      const isWarn = a.type === 'warn';
-      const div = document.createElement('div');
-      div.className = `ov-alert ov-alert-${a.type}`;
-      div.innerHTML = `
-        <div class="ov-alert-icon">${isWarn ? '⚠️' : '✅'}</div>
-        <div class="ov-alert-text">
-          <div class="ov-alert-title">${isWarn ? 'Decline detected' : 'Strong performance'}: ${a.col} (${a.sheet})</div>
-          <div class="ov-alert-sub">${isWarn ? 'Down' : 'Up'} ${Math.abs(a.change).toFixed(1)}% compared to previous period · as of ${a.label}</div>
-        </div>`;
-      aWrap.appendChild(div);
-    });
-    container.appendChild(aWrap);
-  }
-
-  // ── 3. Trend Charts — last 14 periods per sheet ───────────────────────────
-  const trendTitle = document.createElement('div');
-  trendTitle.className = 'ov-section-title';
-  trendTitle.textContent = '📈 14-Period Trend — Primary Metric per Department';
-  container.appendChild(trendTitle);
-
-  const trendGrid = document.createElement('div');
-  trendGrid.className = 'ov-three-col';
-
-  sheetMeta.forEach(({ name, color }) => {
-    const sheet   = allData[name];
-    const nums    = getNumCols(sheet.cols, sheet.rows);
     if (!nums.length || sheet.rows.length < 2) return;
     const dateCol  = getDateCol(sheet.cols, sheet.rows);
-    const valueCol = nums[0];
-    const unit     = detectUnit(name, valueCol);
-    const daily    = getDailyTotals(sheet.rows, dateCol, valueCol, 14);
-    const vals     = daily.map(d => d.val);
-    const total    = vals.reduce((a, b) => a + b, 0);
-    const avg      = vals.length ? total / vals.length : 0;
-    const latest   = vals[vals.length - 1] || 0;
-    const latestChg = pct(latest, avg);
-    const trend    = trendArrow(latestChg);
+
+    // Pick the most meaningful primary column per dept
+    const n = name.toLowerCase();
+    let primaryCol = nums[0];
+    if (n.includes('sale'))   primaryCol = findCol(sheet.cols, ['volume','litr','ltr','qty','quantity']) || nums[0];
+    if (n.includes('financ') || n.includes('cash')) primaryCol = findCol(sheet.cols, ['total','amount','revenue','cash','collection']) || nums[0];
+    if (n.includes('prod'))   primaryCol = findCol(sheet.cols, ['production','produced','output','volume','litr']) || nums[0];
+
+    const unit  = detectUnit(name, primaryCol);
+    const daily = getDailyAgg(sheet.rows, dateCol, [primaryCol], 14);
+    const vals  = daily.map(d => d.totals[primaryCol] || 0);
+    const avg   = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+    const latest = vals[vals.length-1] || 0;
+    const chg = pct(latest, avg);
 
     const card = document.createElement('div');
     card.className = 'card';
@@ -644,139 +827,68 @@ function renderOverview(container) {
     card.innerHTML = `
       <div class="card-header">
         <div>
-          <div class="card-title">${name}</div>
-          <div class="card-sub">${valueCol}${unit ? ' (' + unit + ')' : ''} · ${daily.length}-period avg: ${fmtU(avg, unit, 1)}</div>
+          <div class="card-title">${name} — ${primaryCol}</div>
+          <div class="card-sub">${daily.length}-day window · avg ${fmtU(avg, unit, 1)} · latest ${fmtU(latest, unit)}</div>
         </div>
-        <span class="${trend.cls}">${trend.icon} ${trend.text} vs avg</span>
+        ${trendBadge(chg)}
       </div>`;
-    const cid = 'ov_trend_' + name.replace(/\W/g, '');
-    const { wrap, canvas } = makeCanvas(cid, 160);
+    const cid = 'ov14_' + name.replace(/\W/g,'');
+    const { wrap, canvas } = makeCanvas(cid, 155);
     card.appendChild(wrap);
     trendGrid.appendChild(card);
 
     setTimeout(() => {
-      // Draw avg line as annotation dataset
-      const avgArr = vals.map(() => avg);
       chartInst[cid] = new Chart(canvas, {
-        type: 'line',
+        type: 'bar',
         data: {
           labels: daily.map(d => d.label),
           datasets: [
-            {
-              label: valueCol, data: vals,
-              borderColor: color.main, backgroundColor: color.main + '20',
-              borderWidth: 2.5, fill: true, tension: 0.35, pointRadius: 3, pointHoverRadius: 6
-            },
-            {
-              label: 'Average', data: avgArr,
-              borderColor: color.main + '55', backgroundColor: 'transparent',
-              borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, fill: false
-            }
+            { label: primaryCol, data: vals, backgroundColor: vals.map(v => v >= avg ? color.main + 'cc' : color.main + '55'), borderColor: color.main, borderWidth: 1, borderRadius: 3 },
+            { label: 'Average', data: vals.map(()=>avg), type:'line', borderColor: color.main, borderWidth: 1.5, borderDash:[5,3], pointRadius:0, fill:false }
           ]
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: { callbacks: { label: ctx => ctx.dataset.label === 'Average' ? ` Avg: ${fmtU(ctx.parsed.y, unit, 1)}` : ` ${fmtU(ctx.parsed.y, unit)}` } }
-          },
+          plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: ctx => ctx.dataset.label === 'Average' ? ` Avg: ${fmtU(ctx.parsed.y,unit,1)}` : ` ${fmtU(ctx.parsed.y,unit)}` } } },
           scales: {
-            x: { grid: { display: false }, ticks: { font: { size: 9, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 7 } },
-            y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 9, family: 'DM Mono' }, callback: v => fmt(v) + (unit ? ' ' + unit : '') } }
+            x:{ grid:{display:false}, ticks:{ font:{size:9,family:'DM Mono'}, maxRotation:45, autoSkip:true, maxTicksLimit:8 } },
+            y:{ grid:{color:'#f0ede8'}, ticks:{ font:{size:9,family:'DM Mono'}, callback: v=>fmt(v)+(unit?' '+unit:'') } }
           }
         }
       });
-    }, 60 + sheetMeta.indexOf(sheetMeta.find(s => s.name === name)) * 30);
+    }, 60 + si * 40);
   });
   container.appendChild(trendGrid);
 
-  // ── 4. Department Performance Ranking ─────────────────────────────────────
-  const rankTitle = document.createElement('div');
-  rankTitle.className = 'ov-section-title';
-  rankTitle.textContent = '🏆 Department Performance Ranking — Latest Period';
-  container.appendChild(rankTitle);
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 4 — QUICK-ACCESS DRILL-DOWN BAR
+  // ═══════════════════════════════════════════════════════════════════════════
+  const sec4 = document.createElement('div'); sec4.className = 'ov-sec'; sec4.textContent = 'All-Time Totals — Click to Drill Down';
+  container.appendChild(sec4);
 
-  const twoCol = document.createElement('div');
-  twoCol.className = 'ov-two-col';
-
-  // Build ranking rows across all sheets+numeric cols
-  const rankRows = [];
-  sheetMeta.forEach(({ name, color }) => {
-    const sheet   = allData[name];
-    const nums    = getNumCols(sheet.cols, sheet.rows);
-    const dateCol = getDateCol(sheet.cols, sheet.rows);
-    const { today: todayRows, prev: prevRows, label } = getLatestRows(sheet.rows, dateCol);
-    nums.slice(0, 2).forEach(col => {
-      const unit     = detectUnit(name, col);
-      const todayVal = todayRows.reduce((s, r) => s + (typeof r[col] === 'number' ? r[col] : 0), 0);
-      const prevVal  = prevRows.reduce((s, r) => s + (typeof r[col] === 'number' ? r[col] : 0), 0);
-      const change   = pct(todayVal, prevVal);
-      rankRows.push({ name, col, unit, todayVal, prevVal, change, color, label });
-    });
-  });
-
-  // Top performers (sorted by % change desc, positive only)
-  const positives = [...rankRows].filter(r => r.change !== null).sort((a, b) => b.change - a.change);
-  const negatives = [...rankRows].filter(r => r.change !== null).sort((a, b) => a.change - b.change);
-  const maxAbsChange = Math.max(...rankRows.filter(r=>r.change!==null).map(r=>Math.abs(r.change)), 1);
-
-  function buildRankCard(title, rows, good) {
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML = `<div class="card-header"><div class="card-title">${title}</div></div>`;
-    const tbl = document.createElement('table');
-    tbl.className = 'perf-table';
-    tbl.innerHTML = `<thead><tr><th>#</th><th>Metric</th><th>Latest</th><th>vs Prev</th><th>Bar</th></tr></thead>`;
-    const tbody = document.createElement('tbody');
-    rows.slice(0, 5).forEach((r, i) => {
-      const trend = trendArrow(r.change);
-      const barPct = Math.min((Math.abs(r.change) / maxAbsChange) * 100, 100);
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><span class="rank-num rank-${i+1}">${i+1}</span></td>
-        <td><div style="font-weight:500">${r.col}</div><div style="font-size:10px;color:var(--text-faint)">${r.name}</div></td>
-        <td class="td-num">${fmtU(r.todayVal, r.unit)}</td>
-        <td><span class="${trend.cls}">${trend.text}</span></td>
-        <td><div class="perf-bar-wrap"><div class="perf-bar-fill" style="width:${barPct}%;background:${good ? '#2d6a4f' : '#a0402a'}"></div></div></td>`;
-      tbody.appendChild(tr);
-    });
-    tbl.appendChild(tbody);
-    card.appendChild(tbl);
-    return card;
-  }
-
-  twoCol.appendChild(buildRankCard('🟢 Top Performers', positives, true));
-  twoCol.appendChild(buildRankCard('🔴 Needs Attention', negatives, false));
-  container.appendChild(twoCol);
-
-  // ── 5. Department Summary Bar (click to drill down) ───────────────────────
-  const sumTitle = document.createElement('div');
-  sumTitle.className = 'ov-section-title';
-  sumTitle.textContent = '🗂️ Department Totals — Click to Drill Down';
-  container.appendChild(sumTitle);
-
-  const bar = document.createElement('div');
-  bar.className = 'summary-bar';
+  const ddBar = document.createElement('div');
+  ddBar.className = 'dd-bar';
   sheetMeta.forEach(({ name, color }) => {
     const sheet = allData[name];
     const nums  = getNumCols(sheet.cols, sheet.rows);
-    const primaryCol = nums[0] || null;
-    const unit  = primaryCol ? detectUnit(name, primaryCol) : '';
-    const total = primaryCol ? colSum(sheet.rows, primaryCol) : 0;
+    if (!nums.length) return;
+    const primaryCol = nums[0];
+    const unit  = detectUnit(name, primaryCol);
+    const total = sumCol(sheet.rows, primaryCol);
     const dateCol = getDateCol(sheet.cols, sheet.rows);
     const { today: todayRows, label } = getLatestRows(sheet.rows, dateCol);
-    const todayVal = primaryCol ? todayRows.reduce((s, r) => s + (typeof r[primaryCol] === 'number' ? r[primaryCol] : 0), 0) : 0;
+    const todayVal = sumCol(todayRows, primaryCol);
 
     const cell = document.createElement('div');
-    cell.className = 'sbi';
-    cell.onclick   = () => switchTab(name);
+    cell.className = 'dd-cell';
+    cell.onclick = () => switchTab(name);
     cell.innerHTML = `
-      <div class="sbi-label" style="color:${color.main}">${name}</div>
-      <div class="sbi-value">${fmtU(todayVal, unit) || '—'}</div>
-      <div class="sbi-sub">${label} · All-time: ${fmtU(total, unit)}</div>`;
-    bar.appendChild(cell);
+      <div class="dd-lbl" style="color:${color.main}">${name}</div>
+      <div class="dd-val">${fmtU(todayVal, unit) || '—'}</div>
+      <div class="dd-sub">${label} · All-time: ${fmtU(total, unit)}</div>`;
+    ddBar.appendChild(cell);
   });
-  container.appendChild(bar);
+  container.appendChild(ddBar);
 }
 
 // ── Single sheet ──────────────────────────────────────────────────────────────
