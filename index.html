@@ -308,11 +308,39 @@ let dateFilter = {
 
 // Resolve dateFilter into a {from, to} window (both inclusive, or null = no bound)
 function getFilterWindow() {
-  const now  = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (dateFilter.preset === '7d')  return { from: new Date(today - 6 * 864e5), to: today };
-  if (dateFilter.preset === '30d') return { from: new Date(today - 29 * 864e5), to: today };
-  if (dateFilter.preset === 'mtd') return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: today };
+  const now   = new Date();
+  const sysToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // For relative presets, anchor to the latest date found across all loaded sheets
+  // so "Last 7 Days" means the 7 days ending at the most recent data point —
+  // not today's system date (which may be ahead of the data).
+  function latestDataDate() {
+    let latest = null;
+    Object.values(allData).forEach(({ cols, rows }) => {
+      const dateCol = getDateCol(cols, rows);
+      if (!dateCol) return;
+      rows.forEach(r => {
+        const d = parseRowDate(r[dateCol]);
+        if (!d) return;
+        const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        if (!latest || day > latest) latest = day;
+      });
+    });
+    return latest || sysToday;
+  }
+
+  if (dateFilter.preset === '7d') {
+    const to = latestDataDate();
+    return { from: new Date(to - 6 * 864e5), to };
+  }
+  if (dateFilter.preset === '30d') {
+    const to = latestDataDate();
+    return { from: new Date(to - 29 * 864e5), to };
+  }
+  if (dateFilter.preset === 'mtd') {
+    const to = latestDataDate();
+    return { from: new Date(to.getFullYear(), to.getMonth(), 1), to };
+  }
   if (dateFilter.preset === 'custom') return { from: dateFilter.from, to: dateFilter.to };
   return { from: null, to: null }; // 'all'
 }
@@ -334,9 +362,9 @@ function applyDateFilter(rows, dateCol) {
 
 // Human-readable description of the active filter
 function filterDescription() {
+  if (dateFilter.preset === 'all') return null;
   const { from, to } = getFilterWindow();
-  const fd = d => d.toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
-  if (!from && !to) return null;
+  const fd = d => d ? d.toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '?';
   if (from && to)   return `${fd(from)} – ${fd(to)}`;
   if (from)         return `From ${fd(from)}`;
   if (to)           return `Up to ${fd(to)}`;
