@@ -61,10 +61,12 @@
   .charts-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
 
   .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  thead tr { border-bottom: 1px solid var(--border); }
-  th { padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
-  td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; border: 1px solid var(--border); }
+  thead tr { border-bottom: 2px solid var(--border); background: var(--bg); }
+  th { padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; border-right: 1px solid var(--border); }
+  th:last-child { border-right: none; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); color: var(--text); }
+  td:last-child { border-right: none; }
   tr:last-child td { border-bottom: none; }
   tbody tr:hover { background: var(--bg); }
   .td-num { font-family: 'DM Mono', monospace; font-size: 12px; text-align: right; }
@@ -1910,35 +1912,49 @@ function renderSheet(name, sheet, container) {
   if (nums.length) {
     const isMilkIntake = name.toLowerCase().includes('milk') || name.toLowerCase().includes('intake');
     const dateCol2  = getDateCol(cols, rows);
-    const { today: latestRows, prev: prevRows2, label: latestLabel, prevLabel: prevLabel2 } = getLatestRows(rows, dateCol2);
+    const { today: latestRows, prev: prevRows2, label: latestLabel, prevLabel: prevLabel2, todayMissing: detailMissing } = getLatestRows(rows, dateCol2);
 
-    // ── MILK INTAKE: per-station latest day panel ──────────────────────────────
+    const isFiltered   = dateFilter.preset !== 'all';
+    // When filtered: aggregate all filtered rows; when not: use latest day
+    const aggRows2     = isFiltered ? rows      : latestRows;
+    const aggPrev2     = isFiltered ? []         : prevRows2;
+    const periodLabel  = isFiltered ? (filterDescription() || 'Filtered Period') : latestLabel;
+    const prevLabel2F  = isFiltered ? null        : prevLabel2;
+
+    // ── MILK INTAKE: per-station panel ────────────────────────────────────────
     if (isMilkIntake) {
-      // Identify the TOTALS column (if any) and station columns separately
       const totalsCol   = cols.find(c => /\btotal(s)?\b/i.test(c) && nums.includes(c));
       const stationCols = nums.filter(c => c !== totalsCol);
 
-      // Summary strip: Latest Day TOTAL vs Previous Day
-      const latestTotal = totalsCol ? sumCol(latestRows, totalsCol) : stationCols.reduce((s,c) => s + sumCol(latestRows,c), 0);
-      const prevTotal2  = totalsCol ? sumCol(prevRows2, totalsCol)  : stationCols.reduce((s,c) => s + sumCol(prevRows2,c), 0);
-      const chgTotal    = pct(latestTotal, prevTotal2);
-      const chgColor    = chgTotal === null ? 'var(--text-muted)' : chgTotal >= 0 ? '#1a7f4b' : '#a0402a';
-      const chgArrow    = chgTotal === null ? '' : chgTotal >= 0 ? '▲' : '▼';
-      const chgText     = chgTotal !== null ? `${chgArrow} ${Math.abs(chgTotal).toFixed(1)}%` : '—';
+      const aggTotal   = totalsCol ? sumCol(aggRows2, totalsCol) : stationCols.reduce((s,c) => s + sumCol(aggRows2,c), 0);
+      const prevTotal2 = totalsCol ? sumCol(aggPrev2, totalsCol) : stationCols.reduce((s,c) => s + sumCol(aggPrev2,c), 0);
+      const chgTotal   = isFiltered ? null : pct(aggTotal, prevTotal2);
+      const chgColor   = chgTotal === null ? 'var(--text-muted)' : chgTotal >= 0 ? '#1a7f4b' : '#a0402a';
+      const chgArrow   = chgTotal === null ? '' : chgTotal >= 0 ? '▲' : '▼';
+      const chgText    = chgTotal !== null
+        ? `${chgArrow} ${Math.abs(chgTotal).toFixed(1)}% vs ${prevLabel2F} (${fmt(prevTotal2)} L)`
+        : isFiltered ? `Period total across ${rows.length} day${rows.length !== 1 ? 's' : ''}` : '—';
+
+      // All-time avg uses the full unfiltered dataset
+      const allRows    = rawRows; // rawRows is available from renderSheet scope
+      const allTimeAvg = totalsCol
+        ? colSum(allRows, totalsCol) / Math.max(1, allRows.filter(r => typeof r[totalsCol] === 'number').length)
+        : aggTotal; // fallback
 
       // Top summary bar
       const summaryBar = document.createElement('div');
       summaryBar.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;margin-bottom:1rem;';
       summaryBar.innerHTML = `
         <div style="flex:1;min-width:200px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;border-top:3px solid ${color.main}">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:4px">🥛 Total Milk Received — ${latestLabel}</div>
-          <div style="font-size:30px;font-weight:700;letter-spacing:-1px;color:${color.main};font-family:'DM Mono',monospace">${fmt(latestTotal)} <span style="font-size:16px;font-weight:400">L</span></div>
-          <div style="font-size:12px;color:${chgColor};font-weight:600;margin-top:4px">${chgText} vs ${prevLabel2} (${fmt(prevTotal2)} L)</div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:4px">Total Milk Received — ${periodLabel}</div>
+          <div style="font-size:30px;font-weight:700;letter-spacing:-1px;color:${color.main};font-family:'DM Mono',monospace">${fmt(aggTotal)} <span style="font-size:16px;font-weight:400">L</span></div>
+          <div style="font-size:12px;color:${chgColor};font-weight:600;margin-top:4px">${chgText}</div>
+          ${detailMissing && !isFiltered ? `<div style="font-size:11px;color:#b5460f;background:#fef3ec;border-radius:6px;padding:3px 8px;margin-top:6px;display:inline-block">Yet to be updated today</div>` : ''}
         </div>
         <div style="flex:1;min-width:200px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:6px">Stations Contributing — ${latestLabel}</div>
-          <div style="font-size:22px;font-weight:700;letter-spacing:-.5px">${stationCols.filter(c => sumCol(latestRows,c) > 0).length} <span style="font-size:13px;font-weight:400;color:var(--text-muted)">of ${stationCols.length} active</span></div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">All-time avg/day: ${fmt(totalsCol ? colSum(rows,totalsCol)/rows.length : latestTotal)} L</div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:6px">Stations Contributing — ${periodLabel}</div>
+          <div style="font-size:22px;font-weight:700;letter-spacing:-.5px">${stationCols.filter(c => sumCol(aggRows2,c) > 0).length} <span style="font-size:13px;font-weight:400;color:var(--text-muted)">of ${stationCols.length} active</span></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">All-time avg/day: ${fmt(allTimeAvg)} L</div>
         </div>`;
       container.appendChild(summaryBar);
 
@@ -1946,64 +1962,156 @@ function renderSheet(name, sheet, container) {
       const stGrid = document.createElement('div');
       stGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;margin-bottom:1.25rem;';
       stationCols.forEach(col => {
-        const todayVal  = sumCol(latestRows, col);
-        const prevVal   = sumCol(prevRows2,  col);
-        const allTimeTotal = colSum(rows, col);
-        const allTimeAvg   = allTimeTotal / rows.filter(r => typeof r[col] === 'number').length;
-        const chg = pct(todayVal, prevVal);
+        const aggVal     = sumCol(aggRows2, col);
+        const prevVal    = sumCol(aggPrev2, col);
+        const allRows2   = rawRows;
+        const allTimeTotal = colSum(allRows2, col);
+        const allTimeAvgSt = allTimeTotal / Math.max(1, allRows2.filter(r => typeof r[col] === 'number').length);
+        const chg    = isFiltered ? null : pct(aggVal, prevVal);
         const chgCol = chg === null ? 'var(--text-muted)' : chg >= 0 ? '#1a7f4b' : '#a0402a';
         const badge  = chg !== null
           ? `<span style="display:inline-block;background:${chg>=0?'var(--green-light)':'var(--amber-light)'};color:${chgCol};padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700">${chg>=0?'▲':'▼'} ${Math.abs(chg).toFixed(1)}%</span>`
-          : '';
+          : isFiltered ? `<span style="font-size:10px;color:var(--text-faint)">period total</span>` : '';
         const card2 = document.createElement('div');
         card2.className = 'metric-card';
         card2.style.borderTop = `3px solid ${color.main}88`;
+        card2.style.opacity   = (detailMissing && !isFiltered && aggVal === 0) ? '0.45' : '1';
         card2.innerHTML = `
           <div class="metric-label" style="margin-bottom:3px">${col}</div>
-          <div style="font-size:22px;font-weight:700;letter-spacing:-.6px;color:${color.main};font-family:'DM Mono',monospace">${fmt(todayVal)}<span style="font-size:12px;font-weight:400;color:var(--text-muted);margin-left:2px">L</span></div>
-          <div style="font-size:10px;color:var(--text-muted);margin:2px 0 4px">prev ${fmt(prevVal)} L</div>
+          <div style="font-size:22px;font-weight:700;letter-spacing:-.6px;color:${color.main};font-family:'DM Mono',monospace">${fmt(aggVal)}<span style="font-size:12px;font-weight:400;color:var(--text-muted);margin-left:2px">L</span></div>
+          ${!isFiltered ? `<div style="font-size:10px;color:var(--text-muted);margin:2px 0 4px">prev ${fmt(prevVal)} L</div>` : ''}
           ${badge}
-          <div style="font-size:10px;color:var(--text-faint);margin-top:5px">avg/day ${fmt(allTimeAvg)} L</div>`;
+          <div style="font-size:10px;color:var(--text-faint);margin-top:5px">avg/day ${fmt(allTimeAvgSt)} L</div>`;
         stGrid.appendChild(card2);
       });
 
-      // TOTALS card (if column exists)
+      // TOTALS card
       if (totalsCol) {
-        const allTimeAvgTot = colSum(rows, totalsCol) / rows.filter(r => typeof r[totalsCol] === 'number').length;
-        const chg2 = pct(latestTotal, prevTotal2);
+        const allTimeAvgTot = colSum(rawRows, totalsCol) / Math.max(1, rawRows.filter(r => typeof r[totalsCol] === 'number').length);
+        const chg2    = isFiltered ? null : pct(aggTotal, prevTotal2);
         const chgCol2 = chg2 === null ? 'var(--text-muted)' : chg2 >= 0 ? '#1a7f4b' : '#a0402a';
         const totCard = document.createElement('div');
         totCard.className = 'metric-card';
         totCard.style.cssText += `border-top:3px solid ${color.main};background:var(--green-light);`;
         totCard.innerHTML = `
           <div class="metric-label" style="margin-bottom:3px;color:${color.main}">TOTALS</div>
-          <div style="font-size:22px;font-weight:700;letter-spacing:-.6px;color:${color.main};font-family:'DM Mono',monospace">${fmt(latestTotal)}<span style="font-size:12px;font-weight:400;color:var(--text-muted);margin-left:2px">L</span></div>
-          <div style="font-size:10px;color:var(--text-muted);margin:2px 0 4px">prev ${fmt(prevTotal2)} L</div>
-          <span style="display:inline-block;background:${chg2>=0?'#b7e4c7':'#fde0d8'};color:${chgCol2};padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700">${chg2>=0?'▲':'▼'} ${chg2 !== null ? Math.abs(chg2).toFixed(1)+'%' : '—'}</span>
+          <div style="font-size:22px;font-weight:700;letter-spacing:-.6px;color:${color.main};font-family:'DM Mono',monospace">${fmt(aggTotal)}<span style="font-size:12px;font-weight:400;color:var(--text-muted);margin-left:2px">L</span></div>
+          ${!isFiltered ? `<div style="font-size:10px;color:var(--text-muted);margin:2px 0 4px">prev ${fmt(prevTotal2)} L</div>` : ''}
+          ${chg2 !== null
+            ? `<span style="display:inline-block;background:${chg2>=0?'#b7e4c7':'#fde0d8'};color:${chgCol2};padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700">${chg2>=0?'▲':'▼'} ${Math.abs(chg2).toFixed(1)}%</span>`
+            : `<span style="font-size:10px;color:var(--text-faint)">period total</span>`}
           <div style="font-size:10px;color:var(--text-faint);margin-top:5px">avg/day ${fmt(allTimeAvgTot)} L</div>`;
         stGrid.appendChild(totCard);
       }
       container.appendChild(stGrid);
 
     } else {
-      // ── DEFAULT: generic metric cards (all-time totals) ──────────────────────
-      const grid = document.createElement('div');
-      grid.className = 'metrics-grid';
-      nums.forEach(col => {
-        const unit   = detectUnit(name, col);
-        const total  = colSum(rows, col);
-        const valid  = rows.filter(r => typeof r[col] === 'number');
-        const avg    = valid.length ? total / valid.length : 0;
-        const dp     = total > 999 ? 0 : 1;
-        const card   = document.createElement('div');
-        card.className = 'metric-card';
-        card.innerHTML = `
-          <div class="metric-label">${col}</div>
-          <div class="metric-value">${fmt(total, dp)}<span class="metric-unit">${unit}</span></div>
-          <div class="metric-badge badge-${color.badge}">avg ${fmtU(avg, unit, avg > 100 ? 0 : 1)}</div>`;
-        grid.appendChild(card);
-      });
-      container.appendChild(grid);
+      // ── PRODUCTION: per-station filter-aware panel ───────────────────────────
+      const isProdSheet = name.toLowerCase().includes('prod');
+
+      if (isProdSheet) {
+        const totalsCol   = cols.find(c => /\btotal(s)?\b/i.test(c) && nums.includes(c));
+        const stationCols = nums.filter(c => c !== totalsCol);
+
+        const aggRows2   = isFiltered ? rows      : latestRows;
+        const aggPrev2   = isFiltered ? []         : prevRows2;
+
+        const aggTotal   = totalsCol ? sumCol(aggRows2, totalsCol) : stationCols.reduce((s,c) => s + sumCol(aggRows2,c), 0);
+        const prevTotal2 = totalsCol ? sumCol(aggPrev2, totalsCol) : stationCols.reduce((s,c) => s + sumCol(aggPrev2,c), 0);
+        const chgTotal   = isFiltered ? null : pct(aggTotal, prevTotal2);
+        const chgColor   = chgTotal === null ? 'var(--text-muted)' : chgTotal >= 0 ? '#1a7f4b' : '#a0402a';
+        const chgArrow   = chgTotal === null ? '' : chgTotal >= 0 ? '▲' : '▼';
+        const chgText    = chgTotal !== null
+          ? `${chgArrow} ${Math.abs(chgTotal).toFixed(1)}% vs ${prevLabel2F} (${fmt(prevTotal2)} L)`
+          : isFiltered ? `Period total across ${rows.length} day${rows.length !== 1 ? 's' : ''}` : '—';
+
+        const allTimeAvg = totalsCol
+          ? colSum(rawRows, totalsCol) / Math.max(1, rawRows.filter(r => typeof r[totalsCol] === 'number').length)
+          : aggTotal;
+
+        // Summary bar
+        const summaryBar = document.createElement('div');
+        summaryBar.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;margin-bottom:1rem;';
+        summaryBar.innerHTML = `
+          <div style="flex:1;min-width:200px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;border-top:3px solid ${color.main}">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:4px">Total Production — ${periodLabel}</div>
+            <div style="font-size:30px;font-weight:700;letter-spacing:-1px;color:${color.main};font-family:'DM Mono',monospace">${fmt(aggTotal)} <span style="font-size:16px;font-weight:400">L</span></div>
+            <div style="font-size:12px;color:${chgColor};font-weight:600;margin-top:4px">${chgText}</div>
+            ${detailMissing && !isFiltered ? `<div style="font-size:11px;color:#b5460f;background:#fef3ec;border-radius:6px;padding:3px 8px;margin-top:6px;display:inline-block">Yet to be updated today</div>` : ''}
+          </div>
+          <div style="flex:1;min-width:200px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:6px">Stations Active — ${periodLabel}</div>
+            <div style="font-size:22px;font-weight:700;letter-spacing:-.5px">${stationCols.filter(c => sumCol(aggRows2,c) > 0).length} <span style="font-size:13px;font-weight:400;color:var(--text-muted)">of ${stationCols.length}</span></div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">All-time avg/day: ${fmt(allTimeAvg)} L</div>
+          </div>`;
+        container.appendChild(summaryBar);
+
+        // Per-station cards
+        const stGrid2 = document.createElement('div');
+        stGrid2.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;margin-bottom:1.25rem;';
+        stationCols.forEach(col => {
+          const aggVal    = sumCol(aggRows2, col);
+          const prevVal   = sumCol(aggPrev2, col);
+          const allTimeTot = colSum(rawRows, col);
+          const allTimeAvgSt = allTimeTot / Math.max(1, rawRows.filter(r => typeof r[col] === 'number').length);
+          const chg    = isFiltered ? null : pct(aggVal, prevVal);
+          const chgCol = chg === null ? 'var(--text-muted)' : chg >= 0 ? '#1a7f4b' : '#a0402a';
+          const badge  = chg !== null
+            ? `<span style="display:inline-block;background:${chg>=0?'var(--green-light)':'var(--amber-light)'};color:${chgCol};padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700">${chg>=0?'▲':'▼'} ${Math.abs(chg).toFixed(1)}%</span>`
+            : isFiltered ? `<span style="font-size:10px;color:var(--text-faint)">period total</span>` : '';
+          const card2 = document.createElement('div');
+          card2.className = 'metric-card';
+          card2.style.borderTop = `3px solid ${color.main}88`;
+          card2.style.opacity   = (detailMissing && !isFiltered && aggVal === 0) ? '0.45' : '1';
+          card2.innerHTML = `
+            <div class="metric-label" style="margin-bottom:3px">${col}</div>
+            <div style="font-size:22px;font-weight:700;letter-spacing:-.6px;color:${color.main};font-family:'DM Mono',monospace">${fmt(aggVal)}<span style="font-size:12px;font-weight:400;color:var(--text-muted);margin-left:2px">L</span></div>
+            ${!isFiltered ? `<div style="font-size:10px;color:var(--text-muted);margin:2px 0 4px">prev ${fmt(prevVal)} L</div>` : ''}
+            ${badge}
+            <div style="font-size:10px;color:var(--text-faint);margin-top:5px">avg/day ${fmt(allTimeAvgSt)} L</div>`;
+          stGrid2.appendChild(card2);
+        });
+
+        // TOTALS card
+        if (totalsCol) {
+          const allTimeAvgTot = colSum(rawRows, totalsCol) / Math.max(1, rawRows.filter(r => typeof r[totalsCol] === 'number').length);
+          const chg2    = isFiltered ? null : pct(aggTotal, prevTotal2);
+          const chgCol2 = chg2 === null ? 'var(--text-muted)' : chg2 >= 0 ? '#1a7f4b' : '#a0402a';
+          const totCard = document.createElement('div');
+          totCard.className = 'metric-card';
+          totCard.style.cssText += `border-top:3px solid ${color.main};background:${color.light};`;
+          totCard.innerHTML = `
+            <div class="metric-label" style="margin-bottom:3px;color:${color.main}">TOTAL</div>
+            <div style="font-size:22px;font-weight:700;letter-spacing:-.6px;color:${color.main};font-family:'DM Mono',monospace">${fmt(aggTotal)}<span style="font-size:12px;font-weight:400;color:var(--text-muted);margin-left:2px">L</span></div>
+            ${!isFiltered ? `<div style="font-size:10px;color:var(--text-muted);margin:2px 0 4px">prev ${fmt(prevTotal2)} L</div>` : ''}
+            ${chg2 !== null
+              ? `<span style="display:inline-block;background:${chg2>=0?'#b7e4c7':'#fde0d8'};color:${chgCol2};padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700">${chg2>=0?'▲':'▼'} ${Math.abs(chg2).toFixed(1)}%</span>`
+              : `<span style="font-size:10px;color:var(--text-faint)">period total</span>`}
+            <div style="font-size:10px;color:var(--text-faint);margin-top:5px">avg/day ${fmt(allTimeAvgTot)} L</div>`;
+          stGrid2.appendChild(totCard);
+        }
+        container.appendChild(stGrid2);
+
+      } else {
+        // ── DEFAULT: generic metric cards (all filtered rows summed) ─────────────
+        const grid = document.createElement('div');
+        grid.className = 'metrics-grid';
+        nums.forEach(col => {
+          const unit   = detectUnit(name, col);
+          const total  = colSum(rows, col);
+          const valid  = rows.filter(r => typeof r[col] === 'number');
+          const avg    = valid.length ? total / valid.length : 0;
+          const dp     = total > 999 ? 0 : 1;
+          const card   = document.createElement('div');
+          card.className = 'metric-card';
+          card.innerHTML = `
+            <div class="metric-label">${col}</div>
+            <div class="metric-value">${fmt(total, dp)}<span class="metric-unit">${unit}</span></div>
+            <div class="metric-badge badge-${color.badge}">${isFiltered ? 'period total' : 'avg'} ${isFiltered ? '' : fmtU(avg, unit, avg > 100 ? 0 : 1)}</div>`;
+          grid.appendChild(card);
+        });
+        container.appendChild(grid);
+      }
     }
   }
 
@@ -2494,8 +2602,24 @@ function renderSheet(name, sheet, container) {
         const v   = row[c];
         const isN = typeof v === 'number';
         const u   = isN ? detectUnit(name, c) : '';
-        const d   = v == null ? '—' : isN ? fmtU(v, u, v % 1 !== 0 ? 2 : 0) : String(v);
-        return `<td class="${isN ? 'td-num' : ''}">${d}</td>`;
+        // Try to detect and format date cells as DD/MM/YYYY
+        let display;
+        if (v == null) {
+          display = '—';
+        } else if (isN) {
+          display = fmtU(v, u, v % 1 !== 0 ? 2 : 0);
+        } else {
+          const parsed = parseRowDate(v);
+          if (parsed) {
+            const dd = String(parsed.getDate()).padStart(2, '0');
+            const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+            const yyyy = parsed.getFullYear();
+            display = `${dd}/${mm}/${yyyy}`;
+          } else {
+            display = String(v);
+          }
+        }
+        return `<td class="${isN ? 'td-num' : ''}">${display}</td>`;
       }).join('');
       tbody.appendChild(tr);
     });
