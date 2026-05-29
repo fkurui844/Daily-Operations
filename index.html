@@ -477,7 +477,10 @@ function getDateCol(cols, rows) {
   return cols.find(c => rows.some(r => {
     const v = r[c];
     if (v instanceof Date) return true;
-    if (typeof v === 'string') { const d = new Date(v); return !isNaN(d.getTime()); }
+    if (typeof v === 'string') {
+      if (/^Date\(\d{4},\d{1,2},\d{1,2}\)/.test(v)) return true; // gviz format
+      const d = new Date(v); return !isNaN(d.getTime());
+    }
     return false;
   })) || null;
 }
@@ -485,7 +488,22 @@ function getDateCol(cols, rows) {
 function parseRowDate(v) {
   if (!v) return null;
   if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
-  if (typeof v === 'string') { const d = new Date(v); return isNaN(d.getTime()) ? null : d; }
+  if (typeof v === 'string') {
+    // Google Sheets gviz returns dates as "Date(yyyy,m,d)" — month is 0-indexed
+    const gviz = v.match(/^Date\((\d{4}),(\d{1,2}),(\d{1,2})\)/);
+    if (gviz) {
+      const d = new Date(parseInt(gviz[1]), parseInt(gviz[2]), parseInt(gviz[3]));
+      return isNaN(d.getTime()) ? null : d;
+    }
+    // Also handle "dd/mm/yyyy", "dd-mm-yyyy", "yyyy-mm-dd", ISO strings
+    const dmy = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (dmy) {
+      const d = new Date(parseInt(dmy[3]), parseInt(dmy[2]) - 1, parseInt(dmy[1]));
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
   if (typeof v === 'number') { const d = new Date(v); return isNaN(d.getTime()) ? null : d; }
   return null;
 }
@@ -884,7 +902,7 @@ function renderOverview(container) {
   // ═══════════════════════════════════════════════════════════════════════════
   // SECTION 3 — 14-DAY TREND CHARTS (primary metric per department)
   // ═══════════════════════════════════════════════════════════════════════════
-  const sec3 = document.createElement('div'); sec3.className = 'ov-sec'; sec3.textContent = '14-Day Trend — Primary Metric per Department';
+  const sec3 = document.createElement('div'); sec3.className = 'ov-sec'; sec3.textContent = 'Current Month Trend — Daily Totals per Department';
   container.appendChild(sec3);
 
   const trendGrid = document.createElement('div');
@@ -900,15 +918,16 @@ function renderOverview(container) {
     const n = name.toLowerCase();
     let primaryCol = nums[0];
     if (n.includes('milk') || n.includes('intake')) {
-      // Prefer the TOTALS column; otherwise sum all stations via a virtual approach — use totals if present
       primaryCol = sheet.cols.find(c => /\btotals?\b/i.test(c) && nums.includes(c)) || nums[nums.length - 1];
     }
     if (n.includes('sale'))   primaryCol = findCol(sheet.cols, ['volume','litr','ltr','qty','quantity']) || nums[0];
     if (n.includes('financ') || n.includes('cash')) primaryCol = findCol(sheet.cols, ['total','amount','revenue','cash','collection']) || nums[0];
     if (n.includes('prod'))   primaryCol = findCol(sheet.cols, ['production','produced','output','volume','litr']) || nums[0];
 
+    // Use current month's day count as window (up to 31 days)
+    const daysThisMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
     const unit  = detectUnit(name, primaryCol);
-    const daily = getDailyAgg(sheet.rows, dateCol, [primaryCol], 14);
+    const daily = getDailyAgg(sheet.rows, dateCol, [primaryCol], daysThisMonth);
     const vals  = daily.map(d => d.totals[primaryCol] || 0);
     const avg   = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
     const latest = vals[vals.length-1] || 0;
@@ -918,11 +937,12 @@ function renderOverview(container) {
     card.className = 'card';
     card.style.cursor = 'pointer';
     card.onclick = () => switchTab(name);
+    const monthName = new Date().toLocaleDateString('en-KE', { month: 'long', year: 'numeric' });
     card.innerHTML = `
       <div class="card-header">
         <div>
           <div class="card-title">${name} — ${primaryCol}</div>
-          <div class="card-sub">${daily.length}-day window · avg ${fmtU(avg, unit, 1)} · latest ${fmtU(latest, unit)}</div>
+          <div class="card-sub">${monthName} · ${daily.length} days · avg/day ${fmtU(avg, unit, 1)} · latest ${fmtU(latest, unit)}</div>
         </div>
         ${trendBadge(chg)}
       </div>`;
