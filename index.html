@@ -99,7 +99,47 @@
   .fade-in { animation: fadeIn 0.25s ease; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-  @media (max-width: 768px) { .sidebar { display: none; } .main { max-width: 100vw; padding: 1rem; } .header { padding: 0 1rem; } }
+  /* ── Date Range Filter Bar ─────────────────────────────────────────────── */
+  .filter-bar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 10px 14px;
+    margin-bottom: 1.25rem;
+  }
+  .filter-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); white-space: nowrap; }
+  .filter-presets { display: flex; gap: 5px; flex-wrap: wrap; }
+  .filter-preset {
+    padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text-muted);
+    cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif; white-space: nowrap;
+  }
+  .filter-preset:hover { background: var(--bg); color: var(--text); }
+  .filter-preset.active { background: var(--green); color: #fff; border-color: var(--green); }
+  .filter-divider { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
+  .filter-custom { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .filter-date-input {
+    padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface); font-size: 12px; font-family: 'DM Sans', sans-serif;
+    color: var(--text); cursor: pointer; outline: none;
+  }
+  .filter-date-input:focus { border-color: var(--green); }
+  .filter-range-label { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+  .filter-apply {
+    padding: 5px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    background: var(--green); color: #fff; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; transition: background 0.15s;
+  }
+  .filter-apply:hover { background: #245a41; }
+  .filter-clear {
+    padding: 5px 10px; border-radius: 8px; font-size: 12px; font-weight: 500;
+    background: var(--surface); color: var(--text-muted); border: 1px solid var(--border);
+    cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+  }
+  .filter-clear:hover { background: var(--bg); color: var(--text); }
+  .filter-status { font-size: 11px; color: var(--green); font-weight: 600; white-space: nowrap; margin-left: auto; }
+  .filter-status.off { color: var(--text-faint); font-weight: 400; }
+
+  @media (max-width: 768px) { .sidebar { display: none; } .main { max-width: 100vw; padding: 1rem; } .header { padding: 0 1rem; } .filter-divider { display: none; } }
 </style>
 </head>
 <body>
@@ -181,6 +221,116 @@ let allData     = {};   // { sheetName: { cols, rows } }
 let activeTab   = '__overview__';
 let chartInst   = {};
 let tableShown  = {};   // how many rows are shown per tab
+
+// ── Date Range Filter State ───────────────────────────────────────────────────
+let dateFilter = {
+  preset: 'all',      // 'all' | '7d' | '30d' | 'mtd' | 'custom'
+  from:   null,       // Date or null
+  to:     null,       // Date or null
+};
+
+// Resolve dateFilter into a {from, to} window (both inclusive, or null = no bound)
+function getFilterWindow() {
+  const now  = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (dateFilter.preset === '7d')  return { from: new Date(today - 6 * 864e5), to: today };
+  if (dateFilter.preset === '30d') return { from: new Date(today - 29 * 864e5), to: today };
+  if (dateFilter.preset === 'mtd') return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: today };
+  if (dateFilter.preset === 'custom') return { from: dateFilter.from, to: dateFilter.to };
+  return { from: null, to: null }; // 'all'
+}
+
+// Filter rows by the current date filter window using the detected date column
+function applyDateFilter(rows, dateCol) {
+  const { from, to } = getFilterWindow();
+  if (!from && !to) return rows;   // no filter active
+  if (!dateCol) return rows;       // can't filter without dates
+  return rows.filter(r => {
+    const d = parseRowDate(r[dateCol]);
+    if (!d) return true; // keep undated rows
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (from && day < from) return false;
+    if (to   && day > to)   return false;
+    return true;
+  });
+}
+
+// Human-readable description of the active filter
+function filterDescription() {
+  const { from, to } = getFilterWindow();
+  const fd = d => d.toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
+  if (!from && !to) return null;
+  if (from && to)   return `${fd(from)} – ${fd(to)}`;
+  if (from)         return `From ${fd(from)}`;
+  if (to)           return `Up to ${fd(to)}`;
+  return null;
+}
+
+// Set a preset and re-render current tab
+function setFilterPreset(preset) {
+  dateFilter.preset = preset;
+  dateFilter.from = null;
+  dateFilter.to   = null;
+  tableShown = {}; // reset pagination when filter changes
+  switchTab(activeTab);
+}
+
+// Apply custom date range from inputs
+function applyCustomFilter() {
+  const fromVal = document.getElementById('filter-from') ? document.getElementById('filter-from').value : '';
+  const toVal   = document.getElementById('filter-to')   ? document.getElementById('filter-to').value   : '';
+  dateFilter.preset = 'custom';
+  dateFilter.from = fromVal ? new Date(fromVal) : null;
+  dateFilter.to   = toVal  ? new Date(toVal)   : null;
+  tableShown = {};
+  switchTab(activeTab);
+}
+
+// Clear all filters
+function clearFilter() {
+  dateFilter = { preset: 'all', from: null, to: null };
+  tableShown = {};
+  switchTab(activeTab);
+}
+
+// Build and inject the filter bar into a container element
+function buildFilterBar(container) {
+  const desc = filterDescription();
+  const fmt8601 = d => d ? d.toISOString().split('T')[0] : '';
+  const fromVal = dateFilter.preset === 'custom' ? fmt8601(dateFilter.from) : '';
+  const toVal   = dateFilter.preset === 'custom' ? fmt8601(dateFilter.to)   : '';
+
+  const bar = document.createElement('div');
+  bar.className = 'filter-bar';
+  bar.id = 'active-filter-bar';
+
+  const presets = [
+    { key: 'all',  label: 'All Data' },
+    { key: '7d',   label: 'Last 7 Days' },
+    { key: '30d',  label: 'Last 30 Days' },
+    { key: 'mtd',  label: 'Month to Date' },
+  ];
+
+  bar.innerHTML = `
+    <span class="filter-label">&#128197; Period</span>
+    <div class="filter-presets">
+      ${presets.map(p => `
+        <button class="filter-preset${dateFilter.preset === p.key ? ' active' : ''}"
+          onclick="setFilterPreset('${p.key}')">${p.label}</button>`).join('')}
+    </div>
+    <div class="filter-divider"></div>
+    <div class="filter-custom">
+      <span class="filter-range-label">Custom:</span>
+      <input type="date" id="filter-from" class="filter-date-input" value="${fromVal}">
+      <span class="filter-range-label">&#8594;</span>
+      <input type="date" id="filter-to" class="filter-date-input" value="${toVal}">
+      <button class="filter-apply" onclick="applyCustomFilter()">Apply</button>
+      ${dateFilter.preset !== 'all' ? `<button class="filter-clear" onclick="clearFilter()">&#10005; Clear</button>` : ''}
+    </div>
+    <span class="filter-status ${desc ? '' : 'off'}">${desc ? 'Filtered: ' + desc : 'Showing all data'}</span>`;
+
+  container.appendChild(bar);
+}
 
 // ── Unit detection ───────────────────────────────────────────────────────────
 function detectUnit(sheetName, colName) {
@@ -646,14 +796,18 @@ function renderOverview(container) {
 
   // ── current date display
   const todayStr = new Date().toLocaleDateString('en-KE', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  const filterDesc = filterDescription();
   container.innerHTML = `
     <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:1.1rem;">
       <div>
         <div class="page-title">Daily Operations Overview</div>
-        <div class="page-subtitle">${todayStr} · ${sheetMeta.length} departments · live data</div>
+        <div class="page-subtitle">${todayStr} · ${sheetMeta.length} departments · live data${filterDesc ? ' · <strong style="color:var(--green)">Filtered: ' + filterDesc + '</strong>' : ''}</div>
       </div>
-      <button class="btn btn-primary" onclick="loadAllData()">↻ Refresh</button>
+      <button class="btn btn-primary" onclick="loadAllData()">&#8635; Refresh</button>
     </div>`;
+
+  // ── Filter bar ──────────────────────────────────────────────────────────────
+  buildFilterBar(container);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SECTION 1 — PER-DEPARTMENT DAILY SNAPSHOT CARDS
@@ -669,9 +823,10 @@ function renderOverview(container) {
 
   sheetMeta.forEach(({ name, color }) => {
     const sheet   = allData[name];
-    const { cols, rows } = sheet;
-    const nums    = getNumCols(cols, rows);
-    const dateCol = getDateCol(cols, rows);
+    const { cols, rows: rawRows } = sheet;
+    const nums    = getNumCols(cols, rawRows);
+    const dateCol = getDateCol(cols, rawRows);
+    const rows = applyDateFilter(rawRows, dateCol);
     const { today: todayRows, prev: prevRows, label, prevLabel } = getLatestRows(rows, dateCol);
     const n  = name.toLowerCase();
 
@@ -913,6 +1068,7 @@ function renderOverview(container) {
     const nums    = getNumCols(sheet.cols, sheet.rows);
     if (!nums.length || sheet.rows.length < 2) return;
     const dateCol  = getDateCol(sheet.cols, sheet.rows);
+    const rows     = applyDateFilter(sheet.rows, dateCol);
 
     // Pick the most meaningful primary column per dept
     const n = name.toLowerCase();
@@ -927,7 +1083,7 @@ function renderOverview(container) {
     // Use current month's day count as window (up to 31 days)
     const daysThisMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
     const unit  = detectUnit(name, primaryCol);
-    const daily = getDailyAgg(sheet.rows, dateCol, [primaryCol], daysThisMonth);
+    const daily = getDailyAgg(rows, dateCol, [primaryCol], daysThisMonth);
     const vals  = daily.map(d => d.totals[primaryCol] || 0);
     const avg   = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
     const latest = vals[vals.length-1] || 0;
@@ -937,7 +1093,8 @@ function renderOverview(container) {
     card.className = 'card';
     card.style.cursor = 'pointer';
     card.onclick = () => switchTab(name);
-    const monthName = new Date().toLocaleDateString('en-KE', { month: 'long', year: 'numeric' });
+    const filterDesc2 = filterDescription();
+    const monthName = filterDesc2 || new Date().toLocaleDateString('en-KE', { month: 'long', year: 'numeric' });
     card.innerHTML = `
       <div class="card-header">
         <div>
@@ -992,10 +1149,12 @@ function renderOverview(container) {
       ? (sheet.cols.find(c => /\btotals?\b/i.test(c) && nums.includes(c)) || nums[nums.length - 1])
       : nums[0];
     const unit  = detectUnit(name, primaryCol);
-    const total = sumCol(sheet.rows, primaryCol);
     const dateCol = getDateCol(sheet.cols, sheet.rows);
-    const { today: todayRows, label } = getLatestRows(sheet.rows, dateCol);
+    const filteredRows = applyDateFilter(sheet.rows, dateCol);
+    const total = sumCol(filteredRows, primaryCol);
+    const { today: todayRows, label } = getLatestRows(filteredRows, dateCol);
     const todayVal = sumCol(todayRows, primaryCol);
+    const filterDesc3 = filterDescription();
 
     const cell = document.createElement('div');
     cell.className = 'dd-cell';
@@ -1003,7 +1162,7 @@ function renderOverview(container) {
     cell.innerHTML = `
       <div class="dd-lbl" style="color:${color.main}">${name}</div>
       <div class="dd-val">${fmtU(todayVal, unit) || '—'}</div>
-      <div class="dd-sub">${label} · All-time: ${fmtU(total, unit)}</div>`;
+      <div class="dd-sub">${label} · ${filterDesc3 ? 'Period' : 'All-time'}: ${fmtU(total, unit)}</div>`;
     ddBar.appendChild(cell);
   });
   container.appendChild(ddBar);
@@ -1012,18 +1171,24 @@ function renderOverview(container) {
 // ── Single sheet ──────────────────────────────────────────────────────────────
 function renderSheet(name, sheet, container) {
   container.classList.add('fade-in');
-  const { cols, rows } = sheet;
+  const { cols, rows: rawRows } = sheet;
   const color     = tabColor(name);
+  const dateCol2raw = getDateCol(cols, rawRows);
+  const rows      = applyDateFilter(rawRows, dateCol2raw);
   const nums      = getNumCols(cols, rows);
   const labelCol  = getLabelCol(cols, rows);
+  const filterDesc = filterDescription();
 
   // Page header — title = exact sheet tab name; subtitle = exact column names
   const hdr = document.createElement('div');
   hdr.className = 'page-header';
   hdr.innerHTML = `
     <div class="page-title">${name}</div>
-    <div class="page-subtitle">${rows.length} rows · ${cols.length} columns: ${cols.join(', ')}</div>`;
+    <div class="page-subtitle">${rows.length} rows${filterDesc ? ' <strong style="color:var(--green)">(filtered: ' + filterDesc + ')</strong>' : ''} · ${cols.length} columns: ${cols.join(', ')}</div>`;
   container.appendChild(hdr);
+
+  // ── Filter bar ──────────────────────────────────────────────────────────────
+  buildFilterBar(container);
 
   // ── Production Balance Panel (B/F → C/F) for production/balance sheets ──
   if (isProductionSheet(name, cols)) {
@@ -1227,7 +1392,8 @@ function renderSheet(name, sheet, container) {
   if (nums.length && rows.length > 1) {
     const chartsRow = document.createElement('div');
     chartsRow.className = 'charts-row';
-    const MAX_CHART_ROWS = 30;
+    // When a filter is active the dataset is already smaller — show up to 60 rows in charts
+    const MAX_CHART_ROWS = dateFilter.preset !== 'all' ? 60 : 30;
     const sliced = rows.slice(0, MAX_CHART_ROWS);
     const isSalesSheet   = name.toLowerCase().includes('sale');
     const isFinanceSheet = name.toLowerCase().includes('financ') || name.toLowerCase().includes('cash') || name.toLowerCase().includes('credit') || name.toLowerCase().includes('payment');
