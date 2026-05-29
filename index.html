@@ -139,6 +139,55 @@
   .filter-status { font-size: 11px; color: var(--green); font-weight: 600; white-space: nowrap; margin-left: auto; }
   .filter-status.off { color: var(--text-faint); font-weight: 400; }
 
+  /* ── Auto-Refresh ─────────────────────────────────────────────────────────── */
+  .refresh-ring-wrap {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .refresh-ring {
+    position: relative; width: 32px; height: 32px; flex-shrink: 0; cursor: pointer;
+  }
+  .refresh-ring svg { transform: rotate(-90deg); }
+  .refresh-ring-bg   { fill: none; stroke: var(--border); stroke-width: 3; }
+  .refresh-ring-fill { fill: none; stroke: var(--green); stroke-width: 3;
+    stroke-linecap: round; transition: stroke-dashoffset 1s linear;
+    stroke-dasharray: 82; stroke-dashoffset: 82; }
+  .refresh-ring-icon {
+    position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 13px; transition: transform 0.4s;
+  }
+  .refresh-ring:hover .refresh-ring-icon { transform: rotate(180deg); }
+  .refresh-ring.spinning .refresh-ring-icon { animation: spin 0.7s linear infinite; }
+
+  .refresh-info { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
+  .refresh-updated { font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+  .refresh-countdown { font-size: 10px; color: var(--text-faint); }
+  .refresh-countdown.active { color: var(--green); font-weight: 600; }
+
+  /* Sidebar auto-refresh control */
+  .ar-control { padding: 0.75rem 1rem; margin: 0 0.25rem; background: var(--bg); border-radius: 10px; }
+  .ar-control-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-faint); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+  .ar-toggle { position: relative; width: 32px; height: 18px; cursor: pointer; }
+  .ar-toggle input { opacity: 0; width: 0; height: 0; }
+  .ar-slider { position: absolute; inset: 0; background: var(--border); border-radius: 18px; transition: background 0.2s; }
+  .ar-slider::before { content: ''; position: absolute; width: 12px; height: 12px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform 0.2s; }
+  .ar-toggle input:checked + .ar-slider { background: var(--green); }
+  .ar-toggle input:checked + .ar-slider::before { transform: translateX(14px); }
+  .ar-intervals { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  .ar-interval-btn {
+    flex: 1; min-width: 40px; padding: 5px 4px; border-radius: 6px; font-size: 11px;
+    font-weight: 500; text-align: center; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text-muted); cursor: pointer;
+    transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+  }
+  .ar-interval-btn:hover { background: var(--bg); color: var(--text); }
+  .ar-interval-btn.active { background: var(--green); color: #fff; border-color: var(--green); }
+  .ar-status { font-size: 10px; color: var(--text-muted); margin-top: 6px; text-align: center; }
+  .ar-status.live { color: var(--green); font-weight: 600; }
+
+  /* Silent refresh flash */
+  @keyframes refreshFlash { 0%,100%{opacity:1} 50%{opacity:0.55} }
+  .refresh-flash { animation: refreshFlash 0.6s ease; }
+
   @media (max-width: 768px) { .sidebar { display: none; } .main { max-width: 100vw; padding: 1rem; } .header { padding: 0 1rem; } .filter-divider { display: none; } }
 </style>
 </head>
@@ -152,7 +201,19 @@
       <div class="brand-sub">Live Dashboard</div>
     </div>
   </div>
-  <div class="header-right" id="last-updated">Loading…</div>
+  <div class="refresh-ring-wrap">
+    <div class="refresh-info">
+      <span class="refresh-updated" id="last-updated">Loading…</span>
+      <span class="refresh-countdown" id="refresh-countdown"></span>
+    </div>
+    <div class="refresh-ring" id="refresh-ring" onclick="triggerManualRefresh()" title="Click to refresh now">
+      <svg width="32" height="32" viewBox="0 0 32 32">
+        <circle class="refresh-ring-bg"   cx="16" cy="16" r="13"/>
+        <circle class="refresh-ring-fill" cx="16" cy="16" r="13" id="ring-arc"/>
+      </svg>
+      <div class="refresh-ring-icon" id="ring-icon">↻</div>
+    </div>
+  </div>
 </header>
 
 <div class="layout">
@@ -167,8 +228,24 @@
       </div>
     </div>
     <div class="sidebar-section">
-      <div class="sidebar-label">Actions</div>
-      <button class="nav-item" onclick="loadAllData()">↻ Refresh data</button>
+      <div class="sidebar-label">Auto-Refresh</div>
+      <div class="ar-control">
+        <div class="ar-control-label">
+          <span>Auto-Refresh</span>
+          <label class="ar-toggle">
+            <input type="checkbox" id="ar-toggle-input" onchange="toggleAutoRefresh(this.checked)">
+            <span class="ar-slider"></span>
+          </label>
+        </div>
+        <div class="ar-intervals">
+          <button class="ar-interval-btn" data-mins="5"  onclick="setRefreshInterval(5)">5m</button>
+          <button class="ar-interval-btn active" data-mins="15" onclick="setRefreshInterval(15)">15m</button>
+          <button class="ar-interval-btn" data-mins="30" onclick="setRefreshInterval(30)">30m</button>
+          <button class="ar-interval-btn" data-mins="60" onclick="setRefreshInterval(60)">1h</button>
+        </div>
+        <div class="ar-status" id="ar-status">Off</div>
+      </div>
+      <button class="nav-item" onclick="triggerManualRefresh()">↻ Refresh now</button>
     </div>
   </nav>
   <main class="main">
@@ -332,7 +409,179 @@ function buildFilterBar(container) {
   container.appendChild(bar);
 }
 
-// ── Unit detection ───────────────────────────────────────────────────────────
+// ── Auto-Refresh State ────────────────────────────────────────────────────────
+let arEnabled      = false;
+let arIntervalMins = 15;       // selected interval in minutes
+let arTimerId      = null;     // setInterval handle
+let arCountdownId  = null;     // setInterval for the 1-second ticker
+let arSecondsLeft  = 0;        // countdown seconds remaining
+const CIRCUMFERENCE = 2 * Math.PI * 13; // matches r="13" in the SVG ring
+
+// ── Toggle auto-refresh on/off ────────────────────────────────────────────────
+function toggleAutoRefresh(on) {
+  arEnabled = on;
+  if (on) {
+    startAutoRefresh();
+  } else {
+    stopAutoRefresh();
+  }
+  updateArUI();
+}
+
+// ── Set interval and restart if currently running ─────────────────────────────
+function setRefreshInterval(mins) {
+  arIntervalMins = mins;
+  // Update button styles
+  document.querySelectorAll('.ar-interval-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.mins) === mins);
+  });
+  if (arEnabled) {
+    stopAutoRefresh();
+    startAutoRefresh();
+  }
+  updateArUI();
+}
+
+// ── Start the interval + countdown ticker ─────────────────────────────────────
+function startAutoRefresh() {
+  stopAutoRefresh(); // clear any existing timers first
+  arSecondsLeft = arIntervalMins * 60;
+  tickCountdown();
+  arCountdownId = setInterval(tickCountdown, 1000);
+  // The actual data refresh fires when countdown hits 0 (handled inside tickCountdown)
+}
+
+// ── 1-second countdown tick ───────────────────────────────────────────────────
+function tickCountdown() {
+  if (!arEnabled) return;
+  arSecondsLeft--;
+  updateRingArc();
+  updateCountdownLabel();
+
+  if (arSecondsLeft <= 0) {
+    // Time's up — do a silent background refresh
+    silentRefresh();
+    arSecondsLeft = arIntervalMins * 60; // reset
+  }
+}
+
+// ── Stop all timers ───────────────────────────────────────────────────────────
+function stopAutoRefresh() {
+  if (arTimerId)     { clearInterval(arTimerId);     arTimerId     = null; }
+  if (arCountdownId) { clearInterval(arCountdownId); arCountdownId = null; }
+  arSecondsLeft = 0;
+  updateRingArc();
+  updateCountdownLabel();
+}
+
+// ── Silent refresh: fetch fresh data, re-render current tab without full reload ──
+async function silentRefresh() {
+  const ring = document.getElementById('refresh-ring');
+  if (ring) ring.classList.add('spinning');
+
+  try {
+    // Re-discover sheets and fetch data quietly
+    let tabNames = [];
+    try { tabNames = await discoverSheets(); } catch(e) {}
+    if (!tabNames.length) tabNames = ['Milk Intake', 'Production', 'Sales', 'Finance'];
+
+    const newData = {};
+    const newMeta = [];
+    for (let i = 0; i < tabNames.length; i++) {
+      try {
+        const data = await fetchSheet(tabNames[i]);
+        if (data.cols.length && data.rows.length) {
+          if (isProductionSheet(tabNames[i], data.cols)) {
+            data.rows = applyProductionCalculations(data.cols, data.rows);
+          }
+          newData[tabNames[i]] = data;
+          newMeta.push({ name: tabNames[i], color: TAB_COLORS[newMeta.length % TAB_COLORS.length] });
+        }
+      } catch(e) {}
+    }
+
+    if (newMeta.length) {
+      allData   = newData;
+      sheetMeta = newMeta;
+      tableShown = {};
+      buildNav();
+      // Re-render current tab without disrupting the user's position
+      const dash = document.getElementById('dashboard');
+      if (dash && !dash.classList.contains('hidden')) {
+        dash.classList.add('refresh-flash');
+        setTimeout(() => dash.classList.remove('refresh-flash'), 700);
+        destroyCharts();
+        dash.innerHTML = '';
+        activeTab === '__overview__' ? renderOverview(dash) : renderSheet(activeTab, allData[activeTab] || {cols:[],rows:[]}, dash);
+      }
+      // Update timestamp
+      document.getElementById('last-updated').textContent =
+        'Updated ' + new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+    }
+  } catch(e) {
+    // Silent failure — don't disrupt the user, just log
+    console.warn('Silent refresh failed:', e);
+  } finally {
+    if (ring) ring.classList.remove('spinning');
+  }
+}
+
+// ── Manual refresh button ─────────────────────────────────────────────────────
+function triggerManualRefresh() {
+  if (arEnabled) {
+    // Reset countdown and refresh immediately
+    arSecondsLeft = arIntervalMins * 60;
+    updateRingArc();
+    updateCountdownLabel();
+  }
+  loadAllData();
+}
+
+// ── Update the SVG ring arc based on countdown progress ───────────────────────
+function updateRingArc() {
+  const arc = document.getElementById('ring-arc');
+  if (!arc) return;
+  if (!arEnabled || arSecondsLeft <= 0) {
+    arc.style.strokeDashoffset = CIRCUMFERENCE; // empty
+    return;
+  }
+  const total    = arIntervalMins * 60;
+  const progress = arSecondsLeft / total;               // 1 → 0 as time passes
+  const offset   = CIRCUMFERENCE * (1 - progress);     // fills clockwise
+  arc.style.strokeDashoffset = CIRCUMFERENCE - offset; // remaining arc
+}
+
+// ── Update the text countdown below "Updated …" ──────────────────────────────
+function updateCountdownLabel() {
+  const el = document.getElementById('refresh-countdown');
+  if (!el) return;
+  if (!arEnabled || arSecondsLeft <= 0) {
+    el.textContent = '';
+    el.className = 'refresh-countdown';
+    return;
+  }
+  const m = Math.floor(arSecondsLeft / 60);
+  const s = arSecondsLeft % 60;
+  el.textContent = `Next refresh in ${m > 0 ? m + 'm ' : ''}${s}s`;
+  el.className = 'refresh-countdown active';
+}
+
+// ── Sync sidebar status label ─────────────────────────────────────────────────
+function updateArUI() {
+  const status = document.getElementById('ar-status');
+  if (!status) return;
+  if (arEnabled) {
+    const m = arIntervalMins;
+    status.textContent = `Refreshing every ${m >= 60 ? '1 hour' : m + ' min'}`;
+    status.className = 'ar-status live';
+  } else {
+    status.textContent = 'Off';
+    status.className = 'ar-status';
+  }
+  // Sync toggle checkbox state
+  const toggle = document.getElementById('ar-toggle-input');
+  if (toggle) toggle.checked = arEnabled;
+}
 function detectUnit(sheetName, colName) {
   const s = (colName   || '').toLowerCase();
   const n = (sheetName || '').toLowerCase();
@@ -577,6 +826,8 @@ async function loadAllData() {
 
     activeTab = '__overview__';
     switchTab('__overview__');
+    // Re-sync the auto-refresh UI after nav rebuild
+    updateArUI();
 
   } catch (err) {
     document.getElementById('loading-state').classList.add('hidden');
@@ -790,6 +1041,23 @@ function renderOverview(container) {
       .dd-lbl { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; margin-bottom:3px; }
       .dd-val { font-size:17px; font-weight:700; letter-spacing:-.5px; }
       .dd-sub { font-size:10px; color:var(--text-muted); margin-top:2px; }
+
+      /* ─── combined overview chart ────────────── */
+      .ov-chart-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:1.1rem 1.25rem; margin-bottom:.5rem; }
+      .ov-chart-head { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:.9rem; }
+      .ov-chart-title { font-size:14px; font-weight:600; }
+      .ov-chart-sub   { font-size:11px; color:var(--text-muted); margin-top:2px; }
+      .ov-chart-btns  { display:flex; gap:5px; flex-wrap:wrap; align-items:center; }
+      .ov-chart-btn {
+        padding:4px 12px; border-radius:20px; font-size:11px; font-weight:600;
+        border:1.5px solid var(--border); background:var(--surface); color:var(--text-muted);
+        cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .15s; white-space:nowrap;
+      }
+      .ov-chart-btn:hover { background:var(--bg); color:var(--text); }
+      .ov-chart-btn.active { background:var(--green); color:#fff; border-color:var(--green); }
+      .ov-chart-legend { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:8px; }
+      .ov-chart-legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted); cursor:pointer; }
+      .ov-chart-legend-dot  { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
     `;
     document.head.appendChild(s);
   }
@@ -1055,7 +1323,257 @@ function renderOverview(container) {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION 3 — 14-DAY TREND CHARTS (primary metric per department)
+  // SECTION 2.5 — COMBINED CROSS-DEPARTMENT OVERVIEW CHART
+  // Single chart showing all departments' primary metrics over time
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    // Gather daily series for every department
+    const daysWindow = (() => {
+      const { from, to } = getFilterWindow();
+      if (from && to) return Math.max(7, Math.ceil((to - from) / 864e5) + 1);
+      return new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+    })();
+
+    // Build per-dept series: { name, color, primaryCol, unit, daily }
+    const deptSeries = [];
+    sheetMeta.forEach(({ name, color }) => {
+      const sheet = allData[name];
+      const nums  = getNumCols(sheet.cols, sheet.rows);
+      if (!nums.length) return;
+      const dateCol = getDateCol(sheet.cols, sheet.rows);
+      const rows    = applyDateFilter(sheet.rows, dateCol);
+      if (!rows.length) return;
+
+      const n = name.toLowerCase();
+      let primaryCol = nums[0];
+      if (n.includes('milk') || n.includes('intake'))
+        primaryCol = sheet.cols.find(c => /\btotals?\b/i.test(c) && nums.includes(c)) || nums[nums.length - 1];
+      if (n.includes('sale'))
+        primaryCol = findCol(sheet.cols, ['volume','litr','ltr','qty','quantity']) || nums[0];
+      if (n.includes('financ') || n.includes('cash'))
+        primaryCol = findCol(sheet.cols, ['total','amount','revenue','cash','collection']) || nums[0];
+      if (n.includes('prod'))
+        primaryCol = findCol(sheet.cols, ['production','produced','output','volume','litr']) || nums[0];
+
+      const unit  = detectUnit(name, primaryCol);
+      const daily = getDailyAgg(rows, dateCol, [primaryCol], daysWindow);
+      if (daily.length < 2) return;
+      deptSeries.push({ name, color, primaryCol, unit, daily });
+    });
+
+    if (deptSeries.length >= 2) {
+      // Build a unified sorted date label set across all departments
+      const allDates = new Map(); // dateString → Date object
+      deptSeries.forEach(s => s.daily.forEach(d => {
+        if (!allDates.has(d.label)) allDates.set(d.label, d.d);
+      }));
+      const sortedDates = [...allDates.entries()]
+        .sort((a, b) => a[1] - b[1])
+        .map(e => e[0]);
+
+      // Map each series to the unified labels (fill 0 for missing days)
+      const seriesData = deptSeries.map(s => {
+        const byLabel = {};
+        s.daily.forEach(d => { byLabel[d.label] = d.totals[s.primaryCol] || 0; });
+        return sortedDates.map(lbl => byLabel[lbl] || 0);
+      });
+
+      const sec25 = document.createElement('div');
+      sec25.className = 'ov-sec';
+      sec25.textContent = 'Cross-Department Trend';
+      container.appendChild(sec25);
+
+      const chartCard = document.createElement('div');
+      chartCard.className = 'ov-chart-card';
+
+      // Build view-mode toggle buttons
+      const modes = [
+        { key: 'line',      label: '📈 Lines' },
+        { key: 'bar',       label: '📊 Bars' },
+        { key: 'stacked',   label: '⬛ Stacked' },
+        { key: 'pct',       label: '% Share' },
+      ];
+      const btnIds = modes.map(m => 'ovc_btn_' + m.key);
+
+      // Legend items — use data-dept attribute to avoid quoting issues with sheet names
+      const legendHTML = deptSeries.map((s, i) =>
+        `<div class="ov-chart-legend-item" data-ovc-dept="${i}">
+          <div class="ov-chart-legend-dot" id="ovc_dot_${i}" style="background:${s.color.main}"></div>
+          <span id="ovc_lbl_${i}">${s.name}</span>
+         </div>`
+      ).join('');
+
+      chartCard.innerHTML = `
+        <div class="ov-chart-head">
+          <div>
+            <div class="ov-chart-title">All Departments — Daily Primary Metric</div>
+            <div class="ov-chart-sub" id="ovc-sub">Click legend items to show/hide · Click bars/points to drill down</div>
+          </div>
+          <div class="ov-chart-btns">
+            ${modes.map(m => `<button class="ov-chart-btn${m.key === 'line' ? ' active' : ''}" id="ovc_btn_${m.key}" onclick="ovcSetMode('${m.key}')">${m.label}</button>`).join('')}
+          </div>
+        </div>
+        <div class="ov-chart-legend">${legendHTML}</div>`;
+
+      const { wrap: ovWrap, canvas: ovCanvas } = makeCanvas('ovc_main', 280);
+      chartCard.appendChild(ovWrap);
+      container.appendChild(chartCard);
+
+      // Hidden dept toggle state
+      const hiddenDepts = new Set();
+
+      // Build Chart.js datasets
+      function buildOvcDatasets(mode) {
+        return deptSeries.map((s, i) => {
+          const vals = mode === 'pct'
+            ? seriesData[i].map((v, di) => {
+                const total = deptSeries.reduce((sum, _, j) => sum + (seriesData[j][di] || 0), 0);
+                return total > 0 ? +(v / total * 100).toFixed(1) : 0;
+              })
+            : seriesData[i];
+
+          const hidden = hiddenDepts.has(s.name);
+          const base = {
+            label: s.name,
+            data: vals,
+            hidden,
+            borderColor: s.color.main,
+            backgroundColor: s.color.main + (mode === 'line' ? '18' : 'bb'),
+            borderWidth: mode === 'line' ? 2 : 1,
+            borderRadius: mode !== 'line' ? 4 : 0,
+            tension: 0.35,
+            pointRadius: mode === 'line' ? 3 : 0,
+            pointHoverRadius: 5,
+            fill: mode === 'line' ? false : undefined,
+          };
+          if (mode === 'stacked' || mode === 'pct') base.stack = 'dept';
+          return base;
+        });
+      }
+
+      function buildOvcOptions(mode) {
+        const isStacked = mode === 'stacked' || mode === 'pct';
+        const isPct     = mode === 'pct';
+        return {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          onClick: (evt, elements) => {
+            if (!elements.length) return;
+            const deptIdx = elements[0].datasetIndex;
+            if (deptSeries[deptIdx]) switchTab(deptSeries[deptIdx].name);
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: ctx => ctx[0]?.label || '',
+                label: ctx => {
+                  const s = deptSeries[ctx.datasetIndex];
+                  if (!s) return '';
+                  const v = ctx.parsed.y;
+                  return isPct
+                    ? ` ${s.name}: ${v.toFixed(1)}%`
+                    : ` ${s.name}: ${fmtU(v, s.unit)}`;
+                },
+                footer: ctx => {
+                  if (isPct) return '';
+                  const di = ctx[0]?.dataIndex;
+                  if (di === undefined) return '';
+                  const total = deptSeries.reduce((sum, _, j) => sum + (seriesData[j][di] || 0), 0);
+                  return total > 0 ? `Total: ${fmt(total)}` : '';
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              stacked: isStacked,
+              grid: { display: false },
+              ticks: { font: { size: 9, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 12 }
+            },
+            y: {
+              stacked: isStacked,
+              grid: { color: '#f0ede8' },
+              ticks: {
+                font: { size: 9, family: 'DM Mono' },
+                callback: v => isPct ? v + '%' : fmt(v)
+              },
+              max: isPct ? 100 : undefined,
+            }
+          }
+        };
+      }
+
+      // Render chart after DOM is ready
+      setTimeout(() => {
+        const chartType = 'bar'; // Chart.js type — we control line/bar via dataset type overrides
+        chartInst['ovc_main'] = new Chart(ovCanvas, {
+          type: 'line',
+          data: { labels: sortedDates, datasets: buildOvcDatasets('line') },
+          options: buildOvcOptions('line')
+        });
+
+        // Expose mode switcher globally
+        window.ovcSetMode = function(mode) {
+          const inst = chartInst['ovc_main'];
+          if (!inst) return;
+          // Update button styles
+          modes.forEach(m => {
+            const btn = document.getElementById('ovc_btn_' + m.key);
+            if (btn) btn.classList.toggle('active', m.key === mode);
+          });
+          // Rebuild
+          const type = (mode === 'line') ? 'line' : 'bar';
+          inst.config.type = type;
+          inst.data.datasets = buildOvcDatasets(mode);
+          inst.options = buildOvcOptions(mode);
+          // Sub label
+          const sub = document.getElementById('ovc-sub');
+          if (sub) {
+            sub.textContent = mode === 'pct'
+              ? 'Each band shows each department\'s % share of the combined daily total'
+              : mode === 'stacked'
+              ? 'Bars stacked to show combined daily total across all departments'
+              : 'Click legend to hide/show · Click a point or bar to open that department';
+          }
+          inst.update();
+        };
+
+        window.ovcToggleSeries = function(deptIdx) {
+          const inst = chartInst['ovc_main'];
+          if (!inst) return;
+          const s = deptSeries[deptIdx];
+          if (!s) return;
+          if (hiddenDepts.has(s.name)) hiddenDepts.delete(s.name);
+          else hiddenDepts.add(s.name);
+          // Update legend visual
+          const dot = document.getElementById('ovc_dot_' + deptIdx);
+          const lbl = document.getElementById('ovc_lbl_' + deptIdx);
+          const isHidden = hiddenDepts.has(s.name);
+          if (dot) dot.style.opacity = isHidden ? '0.25' : '1';
+          if (lbl) lbl.style.opacity = isHidden ? '0.4'  : '1';
+          // Re-render datasets
+          const currentMode = modes.find(m => {
+            const btn = document.getElementById('ovc_btn_' + m.key);
+            return btn && btn.classList.contains('active');
+          });
+          inst.data.datasets = buildOvcDatasets(currentMode ? currentMode.key : 'line');
+          inst.update();
+        };
+
+        // Wire legend clicks via event delegation (avoids inline onclick quoting issues)
+        const legendEl = chartCard.querySelector('.ov-chart-legend');
+        if (legendEl) {
+          legendEl.addEventListener('click', e => {
+            const item = e.target.closest('[data-ovc-dept]');
+            if (item) window.ovcToggleSeries(parseInt(item.dataset.ovcDept));
+          });
+        }
+
+      }, 30);
+    }
+  }
   // ═══════════════════════════════════════════════════════════════════════════
   const sec3 = document.createElement('div'); sec3.className = 'ov-sec'; sec3.textContent = 'Current Month Trend — Daily Totals per Department';
   container.appendChild(sec3);
@@ -1913,6 +2431,8 @@ function showMoreRows(sheetName, newCount) {
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
+updateArUI();
+updateRingArc();
 loadAllData();
 </script>
 </body>
