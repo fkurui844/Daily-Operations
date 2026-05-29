@@ -12,7 +12,6 @@
   :root {
     --bg: #f4f1eb;
     --surface: #ffffff;
-    --surface2: #faf8f4;
     --border: #e8e3d8;
     --text: #1a1714;
     --text-muted: #7a7268;
@@ -25,118 +24,66 @@
     --blue-light: #d6eaf8;
     --teal: #0e6655;
     --teal-light: #d5f5e3;
-    --red: #922b21;
-    --red-light: #fadbd8;
-    --accent: #2d6a4f;
     --radius: 10px;
     --radius-lg: 16px;
   }
 
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    font-size: 14px;
-    line-height: 1.5;
-  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; line-height: 1.5; }
 
-  /* Header */
   .header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 0 2rem;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 60px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0 2rem; position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between; height: 60px;
   }
   .header-brand { display: flex; align-items: center; gap: 10px; }
-  .brand-icon {
-    width: 32px; height: 32px; border-radius: 8px;
-    background: var(--green); display: flex; align-items: center;
-    justify-content: center; font-size: 16px;
-  }
+  .brand-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--green); display: flex; align-items: center; justify-content: center; font-size: 16px; }
   .brand-name { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
   .brand-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
   .header-right { font-size: 12px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
 
-  /* Layout */
   .layout { display: flex; min-height: calc(100vh - 60px); }
 
-  /* Sidebar */
   .sidebar {
-    width: 200px; flex-shrink: 0;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    padding: 1.25rem 0;
-    position: sticky;
-    top: 60px;
-    height: calc(100vh - 60px);
-    overflow-y: auto;
+    width: 200px; flex-shrink: 0; background: var(--surface);
+    border-right: 1px solid var(--border); padding: 1.25rem 0;
+    position: sticky; top: 60px; height: calc(100vh - 60px); overflow-y: auto;
   }
   .sidebar-section { padding: 0 1rem; margin-bottom: 1.5rem; }
-  .sidebar-label {
-    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
-    text-transform: uppercase; color: var(--text-faint);
-    padding: 0 0.5rem; margin-bottom: 4px;
-  }
+  .sidebar-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); padding: 0 0.5rem; margin-bottom: 4px; }
   .nav-item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 7px 10px; border-radius: 8px;
-    cursor: pointer; transition: all 0.15s;
-    font-size: 13px; color: var(--text-muted);
-    border: none; background: none; width: 100%; text-align: left;
+    display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+    border-radius: 8px; cursor: pointer; transition: all 0.15s;
+    font-size: 13px; color: var(--text-muted); border: none; background: none; width: 100%; text-align: left;
   }
   .nav-item:hover { background: var(--bg); color: var(--text); }
   .nav-item.active { background: var(--green-light); color: var(--green); font-weight: 500; }
   .nav-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
-  /* Main */
   .main { flex: 1; padding: 1.75rem 2rem; overflow-x: hidden; max-width: calc(100vw - 200px); }
 
-  /* Page header */
   .page-header { margin-bottom: 1.5rem; }
   .page-title { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; }
   .page-subtitle { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
 
-  /* Metrics grid */
   .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 1.75rem; }
-  .metric-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius-lg); padding: 1.1rem 1.25rem;
-  }
+  .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.1rem 1.25rem; }
   .metric-label { font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
   .metric-value { font-size: 26px; font-weight: 600; letter-spacing: -1px; line-height: 1.1; }
-  .metric-unit { font-size: 13px; font-weight: 400; color: var(--text-muted); margin-left: 2px; }
-  .metric-badge {
-    display: inline-flex; align-items: center; gap: 4px;
-    font-size: 11px; font-weight: 500; padding: 3px 8px;
-    border-radius: 20px; margin-top: 6px;
-  }
+  .metric-unit { font-size: 14px; font-weight: 400; color: var(--text-muted); margin-left: 3px; }
+  .metric-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 20px; margin-top: 6px; }
   .badge-green { background: var(--green-light); color: var(--green); }
   .badge-amber { background: var(--amber-light); color: var(--amber); }
   .badge-blue { background: var(--blue-light); color: var(--blue); }
   .badge-teal { background: var(--teal-light); color: var(--teal); }
 
-  /* Cards */
-  .card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius-lg); padding: 1.25rem;
-    margin-bottom: 1rem;
-  }
-  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 1rem; }
+  .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1rem; }
   .card-title { font-size: 14px; font-weight: 600; }
   .card-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
-  /* Chart containers */
   .chart-container { position: relative; }
   .charts-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
 
-  /* Table */
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   thead tr { border-bottom: 1px solid var(--border); }
@@ -146,66 +93,35 @@
   tbody tr:hover { background: var(--bg); }
   .td-num { font-family: 'DM Mono', monospace; font-size: 12px; }
 
-  /* Color dots */
   .dot-green { background: var(--green); }
   .dot-amber { background: #e67e22; }
   .dot-blue { background: var(--blue); }
   .dot-teal { background: var(--teal); }
 
-  /* Loading / Error */
-  .state-box {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius-lg); padding: 3rem 2rem;
-    text-align: center;
-  }
-  .spinner {
-    width: 36px; height: 36px; border: 3px solid var(--border);
-    border-top-color: var(--green); border-radius: 50%;
-    animation: spin 0.7s linear infinite; margin: 0 auto 1rem;
-  }
+  .state-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 3rem 2rem; text-align: center; }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 1rem; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .state-title { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
   .state-sub { font-size: 13px; color: var(--text-muted); max-width: 420px; margin: 0 auto; line-height: 1.6; }
   .error-box { border-color: #f5c6c6; background: #fff8f8; }
-  .error-icon { font-size: 28px; margin-bottom: 10px; }
 
-  /* Legend */
-  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
   .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
-  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
 
-  /* Refresh btn */
-  .btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 500;
-    border: 1px solid var(--border); background: var(--surface);
-    color: var(--text); cursor: pointer; transition: all 0.15s;
-    font-family: 'DM Sans', sans-serif;
-  }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
   .btn:hover { background: var(--bg); }
   .btn-primary { background: var(--green); color: white; border-color: var(--green); }
   .btn-primary:hover { background: #245a41; }
 
-  /* Responsive */
-  @media (max-width: 768px) {
-    .sidebar { display: none; }
-    .main { max-width: 100vw; padding: 1rem; }
-    .header { padding: 0 1rem; }
-  }
+  @media (max-width: 768px) { .sidebar { display: none; } .main { max-width: 100vw; padding: 1rem; } .header { padding: 0 1rem; } }
 
   .hidden { display: none !important; }
   .fade-in { animation: fadeIn 0.3s ease; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
-  .summary-bar {
-    display: grid; grid-template-columns: repeat(4, 1fr);
-    border: 1px solid var(--border); border-radius: var(--radius-lg);
-    overflow: hidden; margin-bottom: 1.75rem; background: var(--surface);
-  }
-  .summary-bar-item {
-    padding: 1rem 1.25rem; border-right: 1px solid var(--border);
-    cursor: pointer; transition: background 0.15s;
-  }
+  .summary-bar { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1.75rem; background: var(--surface); }
+  .summary-bar-item { padding: 1rem 1.25rem; border-right: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
   .summary-bar-item:last-child { border-right: none; }
   .summary-bar-item:hover { background: var(--bg); }
   .summary-bar-item.active { background: var(--green-light); }
@@ -240,7 +156,7 @@
       <button class="nav-item active" onclick="switchTab('overview')" id="nav-overview">
         <span class="nav-dot" style="background:#888"></span> Overview
       </button>
-      <button class="nav-item" onclick="switchTab('Milk Intake')" id="nav-Milk Intake">
+      <button class="nav-item" onclick="switchTab('Milk Intake')" id="nav-MilkIntake">
         <span class="nav-dot dot-green"></span> Milk Intake
       </button>
       <button class="nav-item" onclick="switchTab('Production')" id="nav-Production">
@@ -263,14 +179,15 @@
     <div id="loading-state" class="state-box">
       <div class="spinner"></div>
       <div class="state-title" id="loading-msg">Connecting to Google Sheets…</div>
-      <div class="state-sub">Fetching data from Milk Intake, Production, Sales and Finance tabs.</div>
+      <div class="state-sub">Fetching Milk Intake, Production, Sales and Finance data.</div>
     </div>
 
     <div id="error-state" class="state-box error-box hidden">
-      <div class="error-icon">⚠️</div>
+      <div style="font-size:28px;margin-bottom:10px">⚠️</div>
       <div class="state-title">Could not load data</div>
       <div class="state-sub" id="error-detail">
-        Make sure the sheet is shared as <strong>"Anyone with the link → Viewer"</strong> and published to the web via File → Share → Publish to web.
+        Make sure the sheet is shared as <strong>"Anyone with the link → Viewer"</strong>
+        and published via File → Share → Publish to web.
       </div>
       <br>
       <button class="btn btn-primary" onclick="loadAllData()">Try again</button>
@@ -282,51 +199,88 @@
 
 <script>
 const FILE_ID = '13LiH5I_0qdB6REtOx26cOpBBQLhkJceArjNwc1uUPPM';
-const SHEETS = ['Milk Intake', 'Production', 'Sales', 'Finance'];
+const SHEETS  = ['Milk Intake', 'Production', 'Sales', 'Finance'];
+
 const COLORS = {
   'Milk Intake': '#2d6a4f',
   'Production':  '#c97b2a',
   'Sales':       '#1b4f72',
   'Finance':     '#0e6655'
 };
-const LIGHT_COLORS = {
-  'Milk Intake': '#d8f3dc',
-  'Production':  '#fde8d8',
-  'Sales':       '#d6eaf8',
-  'Finance':     '#d5f5e3'
+const BADGE_CLASS = {
+  'Milk Intake': 'green',
+  'Production':  'amber',
+  'Sales':       'blue',
+  'Finance':     'teal'
+};
+const LINE_PALETTES = {
+  'Milk Intake': ['#2d6a4f','#52b788','#95d5b2','#b7e4c7'],
+  'Production':  ['#c97b2a','#e9a24a','#f4c07a','#fad9a8'],
+  'Sales':       ['#1b4f72','#2980b9','#7fb3d3','#aed6f1'],
+  'Finance':     ['#0e6655','#1abc9c','#76d7c4','#a2d9ce']
 };
 
-let allData = {};
-let activeTab = 'overview';
-let chartInstances = {};
+let allData     = {};
+let activeTab   = 'overview';
+let chartInst   = {};
+
+// ── Unit detection ───────────────────────────────────────────────────────────
+// Returns a short display unit string based on the column header text.
+function detectUnit(sheetName, colName) {
+  const s = (colName || '').toLowerCase();
+  const n = (sheetName || '').toLowerCase();
+  // Litre / liters — also flag for Milk Intake sheet as default
+  if (/\b(l|ltr|litr|litre|liter|litres|liters|volume)\b/.test(s)) return 'L';
+  if (n === 'milk intake') return 'L';           // whole sheet default
+  // Currency
+  if (/\b(kes|ksh|ksh\.|amount|revenue|cost|expense|income|profit|loss|price|value|sales|payment|cash)\b/.test(s)) return 'KES';
+  // Weight
+  if (/\b(kg|kgs|kilogram|weight)\b/.test(s)) return 'kg';
+  // Count / pieces
+  if (/\b(qty|quantity|units|pcs|pieces|count|no\.?|number)\b/.test(s)) return 'units';
+  return '';
+}
+
+// Format a number with optional unit suffix
+function fmtU(v, unit, dp) {
+  if (v == null || isNaN(v)) return '—';
+  const n = Number(v).toLocaleString('en-KE', { maximumFractionDigits: dp ?? (v > 999 ? 0 : 1), minimumFractionDigits: 0 });
+  return unit ? `${n} ${unit}` : n;
+}
+function fmt(v, dp) {
+  if (v == null || isNaN(v)) return '—';
+  return Number(v).toLocaleString('en-KE', { maximumFractionDigits: dp ?? 0, minimumFractionDigits: 0 });
+}
 
 // ── Fetch one sheet ──────────────────────────────────────────────────────────
 async function fetchSheet(name) {
   const url = `https://docs.google.com/spreadsheets/d/${FILE_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(name)}`;
-  const res = await fetch(url);
+  const res  = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const text = await res.text();
+  const text  = await res.text();
   const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
   if (!match) throw new Error('Unexpected response format');
-  const json = JSON.parse(match[1]);
+  const json  = JSON.parse(match[1]);
   if (!json.table) throw new Error('No table data');
   const cols = json.table.cols.map(c => c.label || c.id || '').filter(Boolean);
-  const rows = (json.table.rows || []).map(r => {
-    const obj = {};
-    if (r && r.c) r.c.forEach((cell, i) => { if (cols[i]) obj[cols[i]] = cell ? cell.v : null; });
-    return obj;
-  }).filter(r => Object.values(r).some(v => v !== null && v !== ''));
+  const rows = (json.table.rows || [])
+    .map(r => {
+      const obj = {};
+      if (r && r.c) r.c.forEach((cell, i) => { if (cols[i]) obj[cols[i]] = cell ? cell.v : null; });
+      return obj;
+    })
+    .filter(r => Object.values(r).some(v => v !== null && v !== ''));
   return { cols, rows };
 }
 
-// ── Load all sheets ──────────────────────────────────────────────────────────
+// ── Load all ─────────────────────────────────────────────────────────────────
 async function loadAllData() {
   document.getElementById('loading-state').classList.remove('hidden');
   document.getElementById('error-state').classList.add('hidden');
   document.getElementById('dashboard').classList.add('hidden');
   allData = {};
-
   const errors = [];
+
   for (const name of SHEETS) {
     document.getElementById('loading-msg').textContent = `Loading ${name}…`;
     try { allData[name] = await fetchSheet(name); }
@@ -336,7 +290,8 @@ async function loadAllData() {
   document.getElementById('loading-state').classList.add('hidden');
 
   if (Object.keys(allData).length === 0) {
-    document.getElementById('error-detail').textContent = 'Could not load any sheets. ' + errors.join(' | ');
+    document.getElementById('error-detail').textContent =
+      'Could not load any sheets. ' + errors.join(' | ');
     document.getElementById('error-state').classList.remove('hidden');
     return;
   }
@@ -349,16 +304,13 @@ async function loadAllData() {
   renderTab(activeTab);
 }
 
-// ── Switch tab ───────────────────────────────────────────────────────────────
+// ── Tab switching ────────────────────────────────────────────────────────────
 function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  const navId = 'nav-' + tab;
-  if (document.getElementById(navId)) document.getElementById(navId).classList.add('active');
-  renderTab(tab);
-}
-
-function renderTab(tab) {
+  const idMap = { overview: 'overview', 'Milk Intake': 'MilkIntake', Production: 'Production', Sales: 'Sales', Finance: 'Finance' };
+  const el = document.getElementById('nav-' + (idMap[tab] || tab));
+  if (el) el.classList.add('active');
   destroyCharts();
   const dash = document.getElementById('dashboard');
   dash.innerHTML = '';
@@ -367,32 +319,21 @@ function renderTab(tab) {
 }
 
 function destroyCharts() {
-  Object.values(chartInstances).forEach(c => { try { c.destroy(); } catch(e){} });
-  chartInstances = {};
+  Object.values(chartInst).forEach(c => { try { c.destroy(); } catch(e){} });
+  chartInst = {};
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-function fmt(v, dp = 0) {
-  if (v == null || isNaN(v)) return '—';
-  return Number(v).toLocaleString('en-KE', { maximumFractionDigits: dp, minimumFractionDigits: dp });
-}
-
 function getNumCols(cols, rows) {
-  return cols.filter(c => rows.some(r => typeof r[c] === 'number' && r[c] !== 0));
+  return cols.filter(c => rows.some(r => typeof r[c] === 'number'));
 }
-
 function colSum(rows, col) {
   return rows.reduce((s, r) => s + (typeof r[col] === 'number' ? r[col] : 0), 0);
 }
-
-function colMax(rows, col) {
-  return Math.max(...rows.map(r => typeof r[col] === 'number' ? r[col] : 0));
-}
-
-function makeCanvas(id, height = 240) {
+function makeCanvas(id, height) {
   const wrap = document.createElement('div');
   wrap.className = 'chart-container';
-  wrap.style.height = height + 'px';
+  wrap.style.height = (height || 240) + 'px';
   const c = document.createElement('canvas');
   c.id = id;
   wrap.appendChild(c);
@@ -402,43 +343,41 @@ function makeCanvas(id, height = 240) {
 // ── Overview ─────────────────────────────────────────────────────────────────
 function renderOverview(container) {
   container.classList.add('fade-in');
-
-  // Page header
   container.innerHTML = `
     <div class="page-header">
       <div class="page-title">Operations Overview</div>
-      <div class="page-subtitle">Cross-department summary — all figures from live Google Sheet data</div>
+      <div class="page-subtitle">Cross-department summary — live data from Google Sheets</div>
     </div>`;
 
-  // Summary bar
+  // Summary bar — titles and units come from sheet data
   const summaryBar = document.createElement('div');
   summaryBar.className = 'summary-bar';
-  const deptConfig = [
-    { key: 'Milk Intake', icon: '🐄', unit: 'L' },
-    { key: 'Production', icon: '🏭', unit: 'units' },
-    { key: 'Sales', icon: '💰', unit: 'KES' },
-    { key: 'Finance', icon: '📊', unit: 'KES' },
-  ];
-  deptConfig.forEach(d => {
-    const sheet = allData[d.key];
-    let total = '—', rows = 0;
+
+  SHEETS.forEach(name => {
+    const sheet = allData[name];
+    let totalDisplay = '—', subText = '0 records';
     if (sheet) {
-      rows = sheet.rows.length;
       const nums = getNumCols(sheet.cols, sheet.rows);
-      if (nums.length) total = fmt(colSum(sheet.rows, nums[0]));
+      const primaryCol = nums[0] || null;
+      const unit = primaryCol ? detectUnit(name, primaryCol) : (name === 'Milk Intake' ? 'L' : '');
+      const total = primaryCol ? colSum(sheet.rows, primaryCol) : 0;
+      totalDisplay = fmtU(total, unit);
+      // sub: use the primary column name as context label
+      const colLabel = primaryCol || '';
+      subText = `${sheet.rows.length} records${colLabel ? ' · ' + colLabel : ''}`;
     }
     const item = document.createElement('div');
     item.className = 'summary-bar-item';
-    item.onclick = () => switchTab(d.key);
+    item.onclick = () => switchTab(name);
     item.innerHTML = `
-      <div class="sbi-label">${d.key}</div>
-      <div class="sbi-value">${total}</div>
-      <div class="sbi-sub">${rows} records · ${d.unit}</div>`;
+      <div class="sbi-label">${name}</div>
+      <div class="sbi-value">${totalDisplay}</div>
+      <div class="sbi-sub">${subText}</div>`;
     summaryBar.appendChild(item);
   });
   container.appendChild(summaryBar);
 
-  // Mini charts for each department
+  // Mini charts
   const chartsRow = document.createElement('div');
   chartsRow.className = 'charts-row';
 
@@ -448,21 +387,23 @@ function renderOverview(container) {
     const nums = getNumCols(sheet.cols, sheet.rows);
     if (!nums.length || sheet.rows.length < 2) return;
 
+    const labelCol  = sheet.cols[0];
+    const valueCol  = nums[0];
+    const unit      = detectUnit(name, valueCol);
+    const color     = COLORS[name];
+    const badge     = BADGE_CLASS[name];
+    const sliced    = sheet.rows.slice(0, 14);
+    const total     = colSum(sheet.rows, valueCol);
+
     const card = document.createElement('div');
     card.className = 'card';
-    const labelCol = sheet.cols[0];
-    const valueCol = nums[0];
-    const data = sheet.rows.slice(0, 14);
-    const labels = data.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : '');
-    const values = data.map(r => typeof r[valueCol] === 'number' ? r[valueCol] : 0);
-
     card.innerHTML = `
       <div class="card-header">
         <div>
           <div class="card-title">${name}</div>
-          <div class="card-sub">${valueCol} · ${sheet.rows.length} records</div>
+          <div class="card-sub">${valueCol}${unit ? ' (' + unit + ')' : ''} · ${sheet.rows.length} records</div>
         </div>
-        <span class="metric-badge badge-${name === 'Milk Intake' ? 'green' : name === 'Production' ? 'amber' : name === 'Sales' ? 'blue' : 'teal'}">${fmt(colSum(sheet.rows, valueCol))}</span>
+        <span class="metric-badge badge-${badge}">${fmtU(total, unit)}</span>
       </div>`;
 
     const chartId = 'ov-' + name.replace(/\s/g, '');
@@ -471,14 +412,14 @@ function renderOverview(container) {
     chartsRow.appendChild(card);
 
     setTimeout(() => {
-      chartInstances[chartId] = new Chart(canvas, {
+      chartInst[chartId] = new Chart(canvas, {
         type: 'line',
         data: {
-          labels,
+          labels: sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : ''),
           datasets: [{
-            data: values,
-            borderColor: COLORS[name],
-            backgroundColor: COLORS[name] + '18',
+            data: sliced.map(r => typeof r[valueCol] === 'number' ? r[valueCol] : 0),
+            borderColor: color,
+            backgroundColor: color + '18',
             borderWidth: 2,
             fill: true,
             tension: 0.4,
@@ -488,10 +429,12 @@ function renderOverview(container) {
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
+          plugins: { legend: { display: false },
+            tooltip: { callbacks: { label: ctx => ' ' + fmtU(ctx.parsed.y, unit) } }
+          },
           scales: {
             x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 6 } },
-            y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) } }
+            y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) + (unit ? ' ' + unit : '') } }
           }
         }
       });
@@ -501,130 +444,159 @@ function renderOverview(container) {
   container.appendChild(chartsRow);
 }
 
-// ── Single sheet view ─────────────────────────────────────────────────────────
+// ── Single sheet ─────────────────────────────────────────────────────────────
 function renderSheet(name, sheet, container) {
   container.classList.add('fade-in');
   const { cols, rows } = sheet;
-  const nums = getNumCols(cols, rows);
+  const nums     = getNumCols(cols, rows);
   const labelCol = cols[0];
-  const color = COLORS[name];
-  const lightColor = LIGHT_COLORS[name];
-  const badgeClass = name === 'Milk Intake' ? 'green' : name === 'Production' ? 'amber' : name === 'Sales' ? 'blue' : 'teal';
+  const color    = COLORS[name];
+  const badge    = BADGE_CLASS[name];
+  const palette  = LINE_PALETTES[name];
 
-  // Page header
+  // Page header — use actual sheet name as title
   const hdr = document.createElement('div');
   hdr.className = 'page-header';
   hdr.innerHTML = `
     <div class="page-title">${name}</div>
-    <div class="page-subtitle">${rows.length} records · ${nums.length} numeric columns</div>`;
+    <div class="page-subtitle">${rows.length} records · columns: ${cols.join(', ')}</div>`;
   container.appendChild(hdr);
 
-  // Metric cards
+  // Metric cards — label and unit straight from column headers
   if (nums.length) {
     const grid = document.createElement('div');
     grid.className = 'metrics-grid';
     nums.slice(0, 6).forEach(col => {
+      const unit  = detectUnit(name, col);
       const total = colSum(rows, col);
-      const avg = total / rows.filter(r => typeof r[col] === 'number').length;
-      const card = document.createElement('div');
+      const validRows = rows.filter(r => typeof r[col] === 'number').length;
+      const avg   = validRows ? total / validRows : 0;
+      const dp    = total > 1000 ? 0 : 1;
+      const card  = document.createElement('div');
       card.className = 'metric-card';
       card.innerHTML = `
         <div class="metric-label">${col}</div>
-        <div class="metric-value">${fmt(total, total > 100000 ? 0 : total > 100 ? 0 : 1)}</div>
-        <div class="metric-badge badge-${badgeClass}" style="margin-top:6px">avg ${fmt(avg, avg > 100 ? 0 : 1)}</div>`;
+        <div class="metric-value">${fmt(total, dp)}<span class="metric-unit">${unit}</span></div>
+        <div class="metric-badge badge-${badge}">avg ${fmtU(avg, unit, avg > 100 ? 0 : 1)}</div>`;
       grid.appendChild(card);
     });
     container.appendChild(grid);
   }
 
-  // Charts row
+  // Charts
   if (nums.length && rows.length > 1) {
     const chartsRow = document.createElement('div');
     chartsRow.className = 'charts-row';
+    const maxShow = 20;
+    const sliced  = rows.slice(0, maxShow);
 
-    // Primary bar/line chart
-    if (rows.length >= 2) {
-      const card = document.createElement('div');
-      card.className = 'card';
-      const primaryCol = nums[0];
-      const maxShow = 20;
-      const slicedRows = rows.slice(0, maxShow);
-      card.innerHTML = `
-        <div class="card-header">
-          <div><div class="card-title">${primaryCol} by ${labelCol}</div></div>
-        </div>`;
-      const chartId = name.replace(/\s/g,'') + '-bar';
-      const { wrap, canvas } = makeCanvas(chartId, 260);
-      card.appendChild(wrap);
-      chartsRow.appendChild(card);
+    // Bar chart — primary column, uses its real header as axis label
+    const primaryCol = nums[0];
+    const primaryUnit = detectUnit(name, primaryCol);
+    const barCard = document.createElement('div');
+    barCard.className = 'card';
+    barCard.innerHTML = `
+      <div class="card-header">
+        <div>
+          <div class="card-title">${primaryCol}${primaryUnit ? ' (' + primaryUnit + ')' : ''}</div>
+          <div class="card-sub">by ${labelCol} · showing first ${Math.min(rows.length, maxShow)}</div>
+        </div>
+      </div>`;
+    const barId = name.replace(/\s/g, '') + '-bar';
+    const { wrap: barWrap, canvas: barCanvas } = makeCanvas(barId, 260);
+    barCard.appendChild(barWrap);
+    chartsRow.appendChild(barCard);
 
-      setTimeout(() => {
-        chartInstances[chartId] = new Chart(canvas, {
-          type: 'bar',
-          data: {
-            labels: slicedRows.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 12) : ''),
-            datasets: [{
-              label: primaryCol,
-              data: slicedRows.map(r => typeof r[primaryCol] === 'number' ? r[primaryCol] : 0),
-              backgroundColor: color + 'cc',
-              borderColor: color,
-              borderWidth: 1,
-              borderRadius: 4
-            }]
+    setTimeout(() => {
+      chartInst[barId] = new Chart(barCanvas, {
+        type: 'bar',
+        data: {
+          labels: sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 12) : ''),
+          datasets: [{
+            label: primaryCol,
+            data: sliced.map(r => typeof r[primaryCol] === 'number' ? r[primaryCol] : 0),
+            backgroundColor: color + 'cc',
+            borderColor: color,
+            borderWidth: 1,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => ` ${primaryCol}: ${fmtU(ctx.parsed.y, primaryUnit)}` } }
           },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-              x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: rows.length > 12 } },
-              y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) } }
-            }
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: rows.length > 12 } },
+            y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) + (primaryUnit ? ' ' + primaryUnit : '') } }
           }
-        });
-      }, 50);
-    }
+        }
+      });
+    }, 50);
 
-    // Multi-series line if multiple numeric cols
+    // Multi-series line (when multiple numeric cols)
     if (nums.length > 1) {
-      const card = document.createElement('div');
-      card.className = 'card';
       const seriesCols = nums.slice(0, 4);
-      card.innerHTML = `<div class="card-header"><div><div class="card-title">Multi-series trend</div></div></div>`;
-      const chartId = name.replace(/\s/g,'') + '-line';
-      const maxShow = 20;
-      const slicedRows = rows.slice(0, maxShow);
-      const { wrap, canvas } = makeCanvas(chartId, 260);
+      const lineCard = document.createElement('div');
+      lineCard.className = 'card';
 
-      // Legend
+      // Legend uses actual column names
       const legendEl = document.createElement('div');
       legendEl.className = 'legend';
-      const lineColors = [color, '#c97b2a', '#1b4f72', '#0e6655', '#8e44ad', '#c0392b'];
       seriesCols.forEach((col, i) => {
-        legendEl.innerHTML += `<div class="legend-item"><div class="legend-swatch" style="background:${lineColors[i % lineColors.length]}"></div>${col}</div>`;
+        const u = detectUnit(name, col);
+        legendEl.innerHTML += `
+          <div class="legend-item">
+            <div class="legend-swatch" style="background:${palette[i % palette.length]}"></div>
+            ${col}${u ? ' (' + u + ')' : ''}
+          </div>`;
       });
-      card.appendChild(legendEl);
-      card.appendChild(wrap);
-      chartsRow.appendChild(card);
+
+      lineCard.innerHTML = `
+        <div class="card-header">
+          <div><div class="card-title">Trend — all metrics</div></div>
+        </div>`;
+      lineCard.appendChild(legendEl);
+
+      const lineId = name.replace(/\s/g, '') + '-line';
+      const { wrap: lineWrap, canvas: lineCanvas } = makeCanvas(lineId, 260);
+      lineCard.appendChild(lineWrap);
+      chartsRow.appendChild(lineCard);
 
       setTimeout(() => {
-        chartInstances[chartId] = new Chart(canvas, {
+        chartInst[lineId] = new Chart(lineCanvas, {
           type: 'line',
           data: {
-            labels: slicedRows.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : ''),
-            datasets: seriesCols.map((col, i) => ({
-              label: col,
-              data: slicedRows.map(r => typeof r[col] === 'number' ? r[col] : 0),
-              borderColor: lineColors[i % lineColors.length],
-              backgroundColor: 'transparent',
-              borderWidth: 2,
-              tension: 0.3,
-              pointRadius: 3,
-              borderDash: i % 2 === 1 ? [4, 3] : []
-            }))
+            labels: sliced.map(r => r[labelCol] != null ? String(r[labelCol]).substring(0, 10) : ''),
+            datasets: seriesCols.map((col, i) => {
+              const u = detectUnit(name, col);
+              return {
+                label: col + (u ? ' (' + u + ')' : ''),
+                data: sliced.map(r => typeof r[col] === 'number' ? r[col] : 0),
+                borderColor: palette[i % palette.length],
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                tension: 0.3,
+                pointRadius: 3,
+                borderDash: i % 2 === 1 ? [4, 3] : []
+              };
+            })
           },
           options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: ctx => {
+                    const col = seriesCols[ctx.datasetIndex];
+                    const u   = detectUnit(name, col);
+                    return ` ${col}: ${fmtU(ctx.parsed.y, u)}`;
+                  }
+                }
+              }
+            },
             scales: {
               x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true, maxTicksLimit: 8 } },
               y: { grid: { color: '#f0ede8' }, ticks: { font: { size: 10, family: 'DM Mono' }, callback: v => fmt(v) } }
@@ -637,25 +609,36 @@ function renderSheet(name, sheet, container) {
     container.appendChild(chartsRow);
   }
 
-  // Data table
+  // Data table — headers directly from sheet column names
   const tableCard = document.createElement('div');
   tableCard.className = 'card';
   tableCard.innerHTML = `
     <div class="card-header">
-      <div><div class="card-title">Data table</div><div class="card-sub">Showing ${Math.min(rows.length, 100)} of ${rows.length} rows</div></div>
+      <div>
+        <div class="card-title">Data table — ${name}</div>
+        <div class="card-sub">Showing ${Math.min(rows.length, 100)} of ${rows.length} rows</div>
+      </div>
     </div>`;
-  const wrap = document.createElement('div');
+
+  const wrap  = document.createElement('div');
   wrap.className = 'table-wrap';
   const table = document.createElement('table');
-  table.innerHTML = `<thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>`;
+
+  // TH text = exact column header from sheet; append unit if detected
+  table.innerHTML = `<thead><tr>${cols.map(c => {
+    const u = detectUnit(name, c);
+    return `<th>${c}${u ? ' (' + u + ')' : ''}</th>`;
+  }).join('')}</tr></thead>`;
+
   const tbody = document.createElement('tbody');
   rows.slice(0, 100).forEach(row => {
     const tr = document.createElement('tr');
     tr.innerHTML = cols.map(c => {
-      const v = row[c];
-      const isNum = typeof v === 'number';
-      const display = v == null ? '—' : isNum ? fmt(v, v % 1 !== 0 ? 2 : 0) : String(v);
-      return `<td class="${isNum ? 'td-num' : ''}">${display}</td>`;
+      const v    = row[c];
+      const isN  = typeof v === 'number';
+      const unit = isN ? detectUnit(name, c) : '';
+      const disp = v == null ? '—' : isN ? fmtU(v, unit, v % 1 !== 0 ? 2 : 0) : String(v);
+      return `<td class="${isN ? 'td-num' : ''}">${disp}</td>`;
     }).join('');
     tbody.appendChild(tr);
   });
