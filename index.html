@@ -2851,7 +2851,6 @@ function renderSheet(name, sheet, container) {
     
     // For Production sheets, group by date and add date headers
     const isProdSheet = name.toLowerCase().includes('prod');
-    const dateCol = isProdSheet ? getDateCol(cols, rows) : null;
     
     // TH = exact column header; append detected unit in parentheses
     table.innerHTML = `<thead><tr>${cols.map(c => {
@@ -2861,41 +2860,27 @@ function renderSheet(name, sheet, container) {
     
     const tbody = document.createElement('tbody');
     
-    if (isProdSheet && dateCol) {
-      // Group rows by date for Production sheets
-      const rowsByDate = {};
-      const dateOrder = []; // Track order of dates
+    if (isProdSheet) {
+      // For Production sheets, check first column for dates to group rows
+      const firstCol = cols[0];
+      let currentDate = null;
       
       rows.slice(0, shown).forEach(row => {
-        const d = parseRowDate(row[dateCol]);
-        let dateKey;
-        if (d && !isNaN(d.getTime())) {
-          dateKey = d.toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const firstColValue = row[firstCol];
+        const parsedDate = parseRowDate(firstColValue);
+        
+        // If this row's first column is a date, it's a date header
+        if (parsedDate && !isNaN(parsedDate.getTime())) {
+          currentDate = parsedDate;
+          
+          // Add date header row
+          const dateHeaderRow = document.createElement('tr');
+          dateHeaderRow.style.cssText = 'background:var(--green-light);border-top:2px solid #2d6a4f;border-bottom:1px solid #2d6a4f;font-weight:700;';
+          const dateStr = parsedDate.toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          dateHeaderRow.innerHTML = `<td colspan="${cols.length}" style="padding:10px 12px;color:#2d6a4f;font-size:13px;font-weight:700;">📅 ${dateStr}</td>`;
+          tbody.appendChild(dateHeaderRow);
         } else {
-          // Fallback: use raw value formatted as string
-          const rawVal = row[dateCol];
-          dateKey = rawVal ? String(rawVal).substring(0, 30) : 'No Date';
-        }
-        
-        if (!rowsByDate[dateKey]) {
-          rowsByDate[dateKey] = [];
-          dateOrder.push(dateKey);
-        }
-        rowsByDate[dateKey].push(row);
-      });
-      
-      // Add rows grouped by date with date headers
-      dateOrder.forEach(dateStr => {
-        const dateRows = rowsByDate[dateStr];
-        
-        // Add date header row
-        const dateHeaderRow = document.createElement('tr');
-        dateHeaderRow.style.cssText = 'background:var(--green-light);border-top:2px solid #2d6a4f;border-bottom:1px solid #2d6a4f;font-weight:700;';
-        dateHeaderRow.innerHTML = `<td colspan="${cols.length}" style="padding:10px 12px;color:#2d6a4f;font-size:13px;font-weight:700;">📅 ${dateStr}</td>`;
-        tbody.appendChild(dateHeaderRow);
-        
-        // Add data rows for this date
-        dateRows.forEach(row => {
+          // Regular data row
           const tr = document.createElement('tr');
           tr.innerHTML = cols.map(c => {
             const v   = row[c];
@@ -2920,7 +2905,7 @@ function renderSheet(name, sheet, container) {
             return `<td class="${isN ? 'td-num' : ''}">${display}</td>`;
           }).join('');
           tbody.appendChild(tr);
-        });
+        }
       });
       
       table.appendChild(tbody);
