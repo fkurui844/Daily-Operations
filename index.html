@@ -2028,25 +2028,25 @@ function renderOverview(container) {
       title: 'Sales (KSH) vs Collection (KSH)',
       canvasId: 'comp_sales_collection',
       series: [
-        { name: 'Sales', sheet: 'Sales', keywords: ['sales'], excludeKeywords: [] },
-        { name: 'Collection', sheet: 'Finance', keywords: ['collection','received','cash'], excludeKeywords: ['pending'] }
+        { name: 'Sales', sheet: 'Sales', keywords: ['sales'], excludeKeywords: [], color: TAB_COLORS[2] },
+        { name: 'Collection', sheet: 'Finance', keywords: ['collection','received','cash'], excludeKeywords: ['pending'], color: TAB_COLORS[4] }
       ]
     },
     {
       title: 'Production (L) vs Sales Volume (L)',
       canvasId: 'comp_prod_sales',
       series: [
-        { name: 'Production Output', sheet: 'Production', keywords: ['production','output'], excludeKeywords: ['total'] },
-        { name: 'Sales Volume', sheet: 'Sales', keywords: ['volume','litr','quantity'], excludeKeywords: ['total'] }
+        { name: 'Production Output', sheet: 'Production', keywords: ['production','output'], excludeKeywords: ['total'], color: TAB_COLORS[1] },
+        { name: 'Sales Volume', sheet: 'Sales', keywords: ['volume','litr','quantity'], excludeKeywords: ['total'], color: TAB_COLORS[2] }
       ]
     },
     {
       title: 'Milk Intake (L) vs Production (L) vs Sales (L)',
       canvasId: 'comp_milk_prod_sales',
       series: [
-        { name: 'Milk Intake', sheet: 'Milk Intake', keywords: ['intake','received','milk'], excludeKeywords: ['total','production','sales'] },
-        { name: 'Production', sheet: 'Production', keywords: ['production','output'], excludeKeywords: ['total'] },
-        { name: 'Sales', sheet: 'Sales', keywords: ['volume','litr','quantity'], excludeKeywords: ['total'] }
+        { name: 'Milk Intake', sheet: 'Milk Intake', keywords: ['intake','received','milk'], excludeKeywords: ['total','production','sales'], color: TAB_COLORS[0] },
+        { name: 'Production', sheet: 'Production', keywords: ['production','output'], excludeKeywords: ['total'], color: TAB_COLORS[1] },
+        { name: 'Sales', sheet: 'Sales', keywords: ['volume','litr','quantity'], excludeKeywords: ['total'], color: TAB_COLORS[2] }
       ]
     }
   ];
