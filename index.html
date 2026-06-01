@@ -1285,6 +1285,13 @@ function getDailyAgg(rows, dateCol, valueCols, n) {
 function renderOverview(container) {
   container.classList.add('fade-in');
 
+  // Define daysWindow at function level for use throughout
+  const daysWindow = (() => {
+    const { from, to } = getFilterWindow();
+    if (from && to) return Math.max(7, Math.ceil((to - from) / 864e5) + 1);
+    return new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  })();
+
   // Inject styles once
   if (!document.getElementById('ov-styles')) {
     const s = document.createElement('style');
@@ -1658,11 +1665,6 @@ function renderOverview(container) {
   // ═══════════════════════════════════════════════════════════════════════════
   {
     // Gather daily series for every department
-    const daysWindow = (() => {
-      const { from, to } = getFilterWindow();
-      if (from && to) return Math.max(7, Math.ceil((to - from) / 864e5) + 1);
-      return new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-    })();
 
     // Build per-dept series: { name, color, primaryCol, unit, daily }
     const deptSeries = [];
