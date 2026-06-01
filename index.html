@@ -1732,9 +1732,6 @@ function renderOverview(container) {
             <div class="ov-chart-title">All Departments — Daily Primary Metric</div>
             <div class="ov-chart-sub" id="ovc-sub">Click legend items to show/hide · Click bars/points to drill down</div>
           </div>
-          <div class="ov-chart-btns">
-            ${modes.map(m => `<button class="ov-chart-btn${m.key === 'line' ? ' active' : ''}" id="ovc_btn_${m.key}" onclick="ovcSetMode('${m.key}')">${m.label}</button>`).join('')}
-          </div>
         </div>
         <div class="ov-chart-legend">${legendHTML}</div>`;
 
@@ -1832,9 +1829,9 @@ function renderOverview(container) {
       setTimeout(() => {
         const chartType = 'bar'; // Chart.js type — we control line/bar via dataset type overrides
         chartInst['ovc_main'] = new Chart(ovCanvas, {
-          type: 'line',
-          data: { labels: sortedDates, datasets: buildOvcDatasets('line') },
-          options: buildOvcOptions('line')
+          type: 'bar',
+          data: { labels: sortedDates, datasets: buildOvcDatasets('bar') },
+          options: buildOvcOptions('bar')
         });
 
         // Expose mode switcher globally
