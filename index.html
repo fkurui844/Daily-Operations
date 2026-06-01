@@ -2046,7 +2046,7 @@ function renderOverview(container) {
     }));
     const sortedDates = [...allDates.entries()].sort((a, b) => a[1] - b[1]).map(e => e[0]);
 
-    // Build datasets
+    // Build datasets for line charts
     const datasets = seriesData.map(s => {
       const byLabel = {};
       s.data.daily.forEach(d => { byLabel[d.label] = d.totals[s.data.col] || 0; });
@@ -2054,10 +2054,15 @@ function renderOverview(container) {
         label: s.name,
         data: sortedDates.map(lbl => byLabel[lbl] || 0),
         borderColor: s.color.main,
-        backgroundColor: s.color.main + 'ff',
-        borderWidth: 1.5,
-        borderRadius: 3,
-        barPercentage: 0.75
+        backgroundColor: s.color.main + '15',
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        pointBackgroundColor: s.color.main,
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2
       };
     });
 
@@ -2079,7 +2084,7 @@ function renderOverview(container) {
 
     // Create chart
     const compChart = new Chart(compCanvas, {
-      type: 'bar',
+      type: 'line',
       data: { labels: sortedDates, datasets },
       options: {
         responsive: true,
