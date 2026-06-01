@@ -1986,57 +1986,76 @@ function renderOverview(container) {
   compSection.textContent = '📊 Metric Comparisons';
   container.appendChild(compSection);
 
-  // Helper function to get specific metric data
-  function getComparisonData(sheetName, metricKeywords) {
+  // Helper function to get specific metric data - improved column detection
+  function getComparisonData(sheetName, metricKeywords, excludeKeywords) {
     const sheet = allData[sheetName];
     if (!sheet) return null;
     const nums = getNumCols(sheet.cols, sheet.rows);
     if (!nums.length) return null;
+    
     let col = null;
+    
+    // First, try to find column with exact keyword match (more specific)
     for (const keyword of metricKeywords) {
-      col = sheet.cols.find(c => c.toLowerCase().includes(keyword.toLowerCase()) && nums.includes(c));
-      if (col) break;
+      const candidates = sheet.cols.filter(c => {
+        const lower = c.toLowerCase();
+        // Exclude cumulative/total columns unless specifically asked
+        if (excludeKeywords && excludeKeywords.some(ex => lower.includes(ex))) return false;
+        return lower.includes(keyword.toLowerCase()) && nums.includes(c);
+      });
+      if (candidates.length > 0) {
+        // Prefer columns that don't have "total" in the name for daily metrics
+        col = candidates.find(c => !c.toLowerCase().includes('total')) || candidates[0];
+        if (col) break;
+      }
     }
+    
     if (!col) col = nums[0];
+    
     const dateCol = getDateCol(sheet.cols, sheet.rows);
     const rows = applyDateFilter(sheet.rows, dateCol);
     if (!rows.length) return null;
+    
     const daily = getDailyAgg(rows, dateCol, [col], daysWindow);
     if (daily.length < 2) return null;
+    
     return { col, daily, unit: detectUnit(sheetName, col) };
   }
 
-  // Render comparison charts
+  // Render comparison charts with improved column detection
   const compCharts = [
     {
       title: 'Sales (KSH) vs Collection (KSH)',
       canvasId: 'comp_sales_collection',
       series: [
-        { name: 'Sales', sheet: 'Sales', keywords: ['sales'], color: TAB_COLORS[2] },
-        { name: 'Collection', sheet: 'Finance', keywords: ['collection','received','cash'], color: TAB_COLORS[4] }
+        { name: 'Sales', sheet: 'Sales', keywords: ['sales'], excludeKeywords: [] },
+        { name: 'Collection', sheet: 'Finance', keywords: ['collection','received','cash'], excludeKeywords: ['pending'] }
       ]
     },
     {
       title: 'Production (L) vs Sales Volume (L)',
       canvasId: 'comp_prod_sales',
       series: [
-        { name: 'Production Output', sheet: 'Production', keywords: ['production','output'], color: TAB_COLORS[1] },
-        { name: 'Sales Volume', sheet: 'Sales', keywords: ['volume','litr'], color: TAB_COLORS[2] }
+        { name: 'Production Output', sheet: 'Production', keywords: ['production','output'], excludeKeywords: ['total'] },
+        { name: 'Sales Volume', sheet: 'Sales', keywords: ['volume','litr','quantity'], excludeKeywords: ['total'] }
       ]
     },
     {
       title: 'Milk Intake (L) vs Production (L) vs Sales (L)',
       canvasId: 'comp_milk_prod_sales',
       series: [
-        { name: 'Milk Intake', sheet: 'Milk Intake', keywords: ['total','intake'], color: TAB_COLORS[0] },
-        { name: 'Production', sheet: 'Production', keywords: ['production','output'], color: TAB_COLORS[1] },
-        { name: 'Sales', sheet: 'Sales', keywords: ['volume','litr'], color: TAB_COLORS[2] }
+        { name: 'Milk Intake', sheet: 'Milk Intake', keywords: ['intake','received','milk'], excludeKeywords: ['total','production','sales'] },
+        { name: 'Production', sheet: 'Production', keywords: ['production','output'], excludeKeywords: ['total'] },
+        { name: 'Sales', sheet: 'Sales', keywords: ['volume','litr','quantity'], excludeKeywords: ['total'] }
       ]
     }
   ];
 
   compCharts.forEach((comp, idx) => {
-    const seriesData = comp.series.map(s => ({ ...s, data: getComparisonData(s.sheet, s.keywords) })).filter(s => s.data);
+    const seriesData = comp.series.map(s => ({ 
+      ...s, 
+      data: getComparisonData(s.sheet, s.keywords, s.excludeKeywords) 
+    })).filter(s => s.data);
     if (seriesData.length < 2) return;
 
     // Unify dates across all series
