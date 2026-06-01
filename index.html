@@ -397,23 +397,30 @@
 // ─────────────────────────────────────────────────────────────────────────────
 const FILE_ID = '13LiH5I_0qdB6REtOx26cOpBBQLhkJceArjNwc1uUPPM';
 
-// Colour palette rotated across however many tabs are found
+// Colour palette rotated across however many tabs are found — vibrant & distinct for bar charts
 const TAB_COLORS = [
-  { main: '#2d6a4f', light: '#d8f3dc', badge: 'green' },
-  { main: '#c97b2a', light: '#fde8d8', badge: 'amber' },
-  { main: '#1b4f72', light: '#d6eaf8', badge: 'blue'  },
-  { main: '#0e6655', light: '#d5f5e3', badge: 'teal'  },
-  { main: '#6b3fa0', light: '#ede0ff', badge: 'purple'},
-  { main: '#a0402a', light: '#fde0d8', badge: 'coral' },
+  { main: '#1f77b4', light: '#d6eaf8', badge: 'blue'   },   // Deep Blue
+  { main: '#ff7f0e', light: '#ffe8cc', badge: 'amber'  },   // Vibrant Orange
+  { main: '#2ca02c', light: '#d8f3dc', badge: 'green'  },   // Strong Green
+  { main: '#d62728', light: '#fde0d8', badge: 'coral'  },   // Bold Red
+  { main: '#9467bd', light: '#ede0ff', badge: 'purple' },   // Deep Purple
+  { main: '#17becf', light: '#d6f5f8', badge: 'teal'   },   // Cyan Teal
+  { main: '#e377c2', light: '#ffe0f0', badge: 'pink'   },   // Magenta Pink
+  { main: '#7f7f7f', light: '#e8e8e8', badge: 'gray'   },   // Dark Gray
+  { main: '#bcbd22', light: '#f0f0cc', badge: 'yellow' },   // Olive Yellow
+  { main: '#17a589', light: '#d8f5f0', badge: 'teal'   },   // Teal Green
 ];
 // CSS for badge classes (injected once)
 const BADGE_CSS = `
-  .badge-green  { background:#d8f3dc; color:#2d6a4f; }
-  .badge-amber  { background:#fde8d8; color:#b5460f; }
-  .badge-blue   { background:#d6eaf8; color:#1b4f72; }
-  .badge-teal   { background:#d5f5e3; color:#0e6655; }
-  .badge-purple { background:#ede0ff; color:#6b3fa0; }
-  .badge-coral  { background:#fde0d8; color:#a0402a; }
+  .badge-blue    { background:#d6eaf8; color:#1f77b4; }
+  .badge-amber   { background:#ffe8cc; color:#ff7f0e; }
+  .badge-green   { background:#d8f3dc; color:#2ca02c; }
+  .badge-coral   { background:#fde0d8; color:#d62728; }
+  .badge-purple  { background:#ede0ff; color:#9467bd; }
+  .badge-teal    { background:#d6f5f8; color:#17becf; }
+  .badge-pink    { background:#ffe0f0; color:#e377c2; }
+  .badge-gray    { background:#e8e8e8; color:#7f7f7f; }
+  .badge-yellow  { background:#f0f0cc; color:#bcbd22; }
 `;
 const styleEl = document.createElement('style');
 styleEl.textContent = BADGE_CSS;
