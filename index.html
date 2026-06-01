@@ -1977,8 +1977,126 @@ function renderOverview(container) {
   container.appendChild(trendGrid);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION 4 — QUICK-ACCESS DRILL-DOWN BAR
+  // SECTION 3.5 — METRIC COMPARISONS
   // ═══════════════════════════════════════════════════════════════════════════
+  const compSection = document.createElement('div');
+  compSection.className = 'ov-sec';
+  compSection.textContent = '📊 Metric Comparisons';
+  container.appendChild(compSection);
+
+  // Helper function to get specific metric data
+  function getComparisonData(sheetName, metricKeywords) {
+    const sheet = allData[sheetName];
+    if (!sheet) return null;
+    const nums = getNumCols(sheet.cols, sheet.rows);
+    if (!nums.length) return null;
+    let col = null;
+    for (const keyword of metricKeywords) {
+      col = sheet.cols.find(c => c.toLowerCase().includes(keyword.toLowerCase()) && nums.includes(c));
+      if (col) break;
+    }
+    if (!col) col = nums[0];
+    const dateCol = getDateCol(sheet.cols, sheet.rows);
+    const rows = applyDateFilter(sheet.rows, dateCol);
+    if (!rows.length) return null;
+    const daily = getDailyAgg(rows, dateCol, [col], daysWindow);
+    if (daily.length < 2) return null;
+    return { col, daily, unit: detectUnit(sheetName, col) };
+  }
+
+  // Render comparison charts
+  const compCharts = [
+    {
+      title: 'Sales (KSH) vs Collection (KSH)',
+      canvasId: 'comp_sales_collection',
+      series: [
+        { name: 'Sales', sheet: 'Sales', keywords: ['sales'], color: TAB_COLORS[2] },
+        { name: 'Collection', sheet: 'Finance', keywords: ['collection','received','cash'], color: TAB_COLORS[4] }
+      ]
+    },
+    {
+      title: 'Production (L) vs Sales Volume (L)',
+      canvasId: 'comp_prod_sales',
+      series: [
+        { name: 'Production Output', sheet: 'Production', keywords: ['production','output'], color: TAB_COLORS[1] },
+        { name: 'Sales Volume', sheet: 'Sales', keywords: ['volume','litr'], color: TAB_COLORS[2] }
+      ]
+    },
+    {
+      title: 'Milk Intake (L) vs Production (L) vs Sales (L)',
+      canvasId: 'comp_milk_prod_sales',
+      series: [
+        { name: 'Milk Intake', sheet: 'Milk Intake', keywords: ['total','intake'], color: TAB_COLORS[0] },
+        { name: 'Production', sheet: 'Production', keywords: ['production','output'], color: TAB_COLORS[1] },
+        { name: 'Sales', sheet: 'Sales', keywords: ['volume','litr'], color: TAB_COLORS[2] }
+      ]
+    }
+  ];
+
+  compCharts.forEach((comp, idx) => {
+    const seriesData = comp.series.map(s => ({ ...s, data: getComparisonData(s.sheet, s.keywords) })).filter(s => s.data);
+    if (seriesData.length < 2) return;
+
+    // Unify dates across all series
+    const allDates = new Map();
+    seriesData.forEach(s => s.data.daily.forEach(d => {
+      if (!allDates.has(d.label)) allDates.set(d.label, d.d);
+    }));
+    const sortedDates = [...allDates.entries()].sort((a, b) => a[1] - b[1]).map(e => e[0]);
+
+    // Build datasets
+    const datasets = seriesData.map(s => {
+      const byLabel = {};
+      s.data.daily.forEach(d => { byLabel[d.label] = d.totals[s.data.col] || 0; });
+      return {
+        label: s.name,
+        data: sortedDates.map(lbl => byLabel[lbl] || 0),
+        borderColor: s.color.main,
+        backgroundColor: s.color.main + 'ff',
+        borderWidth: 1.5,
+        borderRadius: 3,
+        barPercentage: 0.75
+      };
+    });
+
+    // Create comparison chart card
+    const compCard = document.createElement('div');
+    compCard.className = 'ov-chart-card';
+    compCard.style.marginBottom = '1rem';
+    const { wrap: compWrap, canvas: compCanvas } = makeCanvas(comp.canvasId, 200);
+    
+    compCard.innerHTML = `
+      <div class="ov-chart-head">
+        <div>
+          <div class="ov-chart-title">${comp.title}</div>
+          <div class="ov-chart-sub">Daily comparison</div>
+        </div>
+      </div>`;
+    compCard.appendChild(compWrap);
+    container.appendChild(compCard);
+
+    // Create chart
+    const compChart = new Chart(compCanvas, {
+      type: 'bar',
+      data: { labels: sortedDates, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        interaction: { intersect: false, mode: 'index' },
+        plugins: {
+          legend: { position: 'bottom', labels: { padding: 12, font: { size: 10 }, boxWidth: 8 } },
+          filler: { propagate: true }
+        },
+        scales: {
+          x: { stacked: false },
+          y: { stacked: false, grid: { color: '#f0ede8' }, ticks: { font: { size: 9, family: 'DM Mono' }, callback: v => fmt(v) } }
+        }
+      }
+    });
+    chartInst[comp.canvasId] = compChart;
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════════
   const sec4 = document.createElement('div'); sec4.className = 'ov-sec'; sec4.textContent = 'All-Time Totals — Click to Drill Down';
   container.appendChild(sec4);
 
