@@ -2822,40 +2822,103 @@ function renderSheet(name, sheet, container) {
       </div>`;
     const wrap  = document.createElement('div'); wrap.className = 'table-wrap';
     const table = document.createElement('table');
-    // TH = exact column header; append detected unit in parentheses
-    table.innerHTML = `<thead><tr>${cols.map(c => {
-      const u = detectUnit(name, c);
-      return `<th>${c}${u ? ' (' + u + ')' : ''}</th>`;
-    }).join('')}</tr></thead>`;
-    const tbody = document.createElement('tbody');
-    rows.slice(0, shown).forEach(row => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = cols.map(c => {
-        const v   = row[c];
-        const isN = typeof v === 'number';
-        const u   = isN ? detectUnit(name, c) : '';
-        // Try to detect and format date cells as DD/MM/YYYY
-        let display;
-        if (v == null) {
-          display = '—';
-        } else if (isN) {
-          display = fmtU(v, u, v % 1 !== 0 ? 2 : 0);
-        } else {
-          const parsed = parseRowDate(v);
-          if (parsed) {
-            const dd = String(parsed.getDate()).padStart(2, '0');
-            const mm = String(parsed.getMonth() + 1).padStart(2, '0');
-            const yyyy = parsed.getFullYear();
-            display = `${dd}/${mm}/${yyyy}`;
+    
+    // For Production sheets, group by date and add date headers
+    const isProdSheet = name.toLowerCase().includes('prod');
+    const dateCol = isProdSheet ? getDateCol(cols, rows) : null;
+    
+    if (isProdSheet && dateCol) {
+      // Group rows by date
+      const rowsByDate = {};
+      rows.slice(0, shown).forEach(row => {
+        const d = parseRowDate(row[dateCol]);
+        const dateKey = d ? d.toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : 'No Date';
+        if (!rowsByDate[dateKey]) rowsByDate[dateKey] = [];
+        rowsByDate[dateKey].push(row);
+      });
+      
+      const tbody = document.createElement('tbody');
+      
+      // Add table header once
+      table.innerHTML = `<thead><tr>${cols.map(c => {
+        const u = detectUnit(name, c);
+        return `<th>${c}${u ? ' (' + u + ')' : ''}</th>`;
+      }).join('')}</tr></thead>`;
+      
+      // Add rows grouped by date with date headers
+      Object.entries(rowsByDate).forEach(([dateStr, dateRows]) => {
+        // Add date header row
+        const dateHeaderRow = document.createElement('tr');
+        dateHeaderRow.style.cssText = 'background:var(--green-light);border-top:2px solid #2d6a4f;border-bottom:1px solid #2d6a4f;';
+        dateHeaderRow.innerHTML = `<td colspan="${cols.length}" style="padding:8px 12px;font-weight:700;color:#2d6a4f;font-size:12px;">📅 ${dateStr}</td>`;
+        tbody.appendChild(dateHeaderRow);
+        
+        // Add data rows for this date
+        dateRows.forEach(row => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = cols.map(c => {
+            const v   = row[c];
+            const isN = typeof v === 'number';
+            const u   = isN ? detectUnit(name, c) : '';
+            let display;
+            if (v == null) {
+              display = '—';
+            } else if (isN) {
+              display = fmtU(v, u, v % 1 !== 0 ? 2 : 0);
+            } else {
+              const parsed = parseRowDate(v);
+              if (parsed) {
+                const dd = String(parsed.getDate()).padStart(2, '0');
+                const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+                const yyyy = parsed.getFullYear();
+                display = `${dd}/${mm}/${yyyy}`;
+              } else {
+                display = String(v);
+              }
+            }
+            return `<td class="${isN ? 'td-num' : ''}">${display}</td>`;
+          }).join('');
+          tbody.appendChild(tr);
+        });
+      });
+      
+      table.appendChild(tbody);
+    } else {
+      // Original table logic for non-Production sheets
+      table.innerHTML = `<thead><tr>${cols.map(c => {
+        const u = detectUnit(name, c);
+        return `<th>${c}${u ? ' (' + u + ')' : ''}</th>`;
+      }).join('')}</tr></thead>`;
+      const tbody = document.createElement('tbody');
+      rows.slice(0, shown).forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = cols.map(c => {
+          const v   = row[c];
+          const isN = typeof v === 'number';
+          const u   = isN ? detectUnit(name, c) : '';
+          let display;
+          if (v == null) {
+            display = '—';
+          } else if (isN) {
+            display = fmtU(v, u, v % 1 !== 0 ? 2 : 0);
           } else {
-            display = String(v);
+            const parsed = parseRowDate(v);
+            if (parsed) {
+              const dd = String(parsed.getDate()).padStart(2, '0');
+              const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+              const yyyy = parsed.getFullYear();
+              display = `${dd}/${mm}/${yyyy}`;
+            } else {
+              display = String(v);
+            }
           }
-        }
-        return `<td class="${isN ? 'td-num' : ''}">${display}</td>`;
-      }).join('');
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
+          return `<td class="${isN ? 'td-num' : ''}">${display}</td>`;
+        }).join('');
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+    }
+    
     wrap.appendChild(table);
     tableCard.appendChild(wrap);
     // Show more / show all buttons
