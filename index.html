@@ -2827,30 +2827,45 @@ function renderSheet(name, sheet, container) {
     const isProdSheet = name.toLowerCase().includes('prod');
     const dateCol = isProdSheet ? getDateCol(cols, rows) : null;
     
+    // TH = exact column header; append detected unit in parentheses
+    table.innerHTML = `<thead><tr>${cols.map(c => {
+      const u = detectUnit(name, c);
+      return `<th>${c}${u ? ' (' + u + ')' : ''}</th>`;
+    }).join('')}</tr></thead>`;
+    
+    const tbody = document.createElement('tbody');
+    
     if (isProdSheet && dateCol) {
-      // Group rows by date
+      // Group rows by date for Production sheets
       const rowsByDate = {};
+      const dateOrder = []; // Track order of dates
+      
       rows.slice(0, shown).forEach(row => {
         const d = parseRowDate(row[dateCol]);
-        const dateKey = d ? d.toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : 'No Date';
-        if (!rowsByDate[dateKey]) rowsByDate[dateKey] = [];
+        let dateKey;
+        if (d && !isNaN(d.getTime())) {
+          dateKey = d.toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        } else {
+          // Fallback: use raw value formatted as string
+          const rawVal = row[dateCol];
+          dateKey = rawVal ? String(rawVal).substring(0, 30) : 'No Date';
+        }
+        
+        if (!rowsByDate[dateKey]) {
+          rowsByDate[dateKey] = [];
+          dateOrder.push(dateKey);
+        }
         rowsByDate[dateKey].push(row);
       });
       
-      const tbody = document.createElement('tbody');
-      
-      // Add table header once
-      table.innerHTML = `<thead><tr>${cols.map(c => {
-        const u = detectUnit(name, c);
-        return `<th>${c}${u ? ' (' + u + ')' : ''}</th>`;
-      }).join('')}</tr></thead>`;
-      
       // Add rows grouped by date with date headers
-      Object.entries(rowsByDate).forEach(([dateStr, dateRows]) => {
+      dateOrder.forEach(dateStr => {
+        const dateRows = rowsByDate[dateStr];
+        
         // Add date header row
         const dateHeaderRow = document.createElement('tr');
-        dateHeaderRow.style.cssText = 'background:var(--green-light);border-top:2px solid #2d6a4f;border-bottom:1px solid #2d6a4f;';
-        dateHeaderRow.innerHTML = `<td colspan="${cols.length}" style="padding:8px 12px;font-weight:700;color:#2d6a4f;font-size:12px;">📅 ${dateStr}</td>`;
+        dateHeaderRow.style.cssText = 'background:var(--green-light);border-top:2px solid #2d6a4f;border-bottom:1px solid #2d6a4f;font-weight:700;';
+        dateHeaderRow.innerHTML = `<td colspan="${cols.length}" style="padding:10px 12px;color:#2d6a4f;font-size:13px;font-weight:700;">📅 ${dateStr}</td>`;
         tbody.appendChild(dateHeaderRow);
         
         // Add data rows for this date
@@ -2867,7 +2882,7 @@ function renderSheet(name, sheet, container) {
               display = fmtU(v, u, v % 1 !== 0 ? 2 : 0);
             } else {
               const parsed = parseRowDate(v);
-              if (parsed) {
+              if (parsed && !isNaN(parsed.getTime())) {
                 const dd = String(parsed.getDate()).padStart(2, '0');
                 const mm = String(parsed.getMonth() + 1).padStart(2, '0');
                 const yyyy = parsed.getFullYear();
@@ -2885,11 +2900,7 @@ function renderSheet(name, sheet, container) {
       table.appendChild(tbody);
     } else {
       // Original table logic for non-Production sheets
-      table.innerHTML = `<thead><tr>${cols.map(c => {
-        const u = detectUnit(name, c);
-        return `<th>${c}${u ? ' (' + u + ')' : ''}</th>`;
-      }).join('')}</tr></thead>`;
-      const tbody = document.createElement('tbody');
+      const tbody2 = document.createElement('tbody');
       rows.slice(0, shown).forEach(row => {
         const tr = document.createElement('tr');
         tr.innerHTML = cols.map(c => {
@@ -2903,7 +2914,7 @@ function renderSheet(name, sheet, container) {
             display = fmtU(v, u, v % 1 !== 0 ? 2 : 0);
           } else {
             const parsed = parseRowDate(v);
-            if (parsed) {
+            if (parsed && !isNaN(parsed.getTime())) {
               const dd = String(parsed.getDate()).padStart(2, '0');
               const mm = String(parsed.getMonth() + 1).padStart(2, '0');
               const yyyy = parsed.getFullYear();
@@ -2914,9 +2925,9 @@ function renderSheet(name, sheet, container) {
           }
           return `<td class="${isN ? 'td-num' : ''}">${display}</td>`;
         }).join('');
-        tbody.appendChild(tr);
+        tbody2.appendChild(tr);
       });
-      table.appendChild(tbody);
+      table.appendChild(tbody2);
     }
     
     wrap.appendChild(table);
