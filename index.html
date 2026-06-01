@@ -2849,7 +2849,7 @@ function renderSheet(name, sheet, container) {
     const wrap  = document.createElement('div'); wrap.className = 'table-wrap';
     const table = document.createElement('table');
     
-    // For Production sheets, group by date and add date headers
+    // For Production sheets, find the date column
     const isProdSheet = name.toLowerCase().includes('prod');
     
     // TH = exact column header; append detected unit in parentheses
@@ -2861,26 +2861,74 @@ function renderSheet(name, sheet, container) {
     const tbody = document.createElement('tbody');
     
     if (isProdSheet) {
-      // For Production sheets, check first column for dates to group rows
-      const firstCol = cols[0];
-      let currentDate = null;
+      // For Production, find which column contains dates
+      let dateColIndex = -1;
+      const rozsAhead = rows.slice(0, Math.min(20, rows.length));
       
-      rows.slice(0, shown).forEach(row => {
-        const firstColValue = row[firstCol];
-        const parsedDate = parseRowDate(firstColValue);
+      // Check each column to find dates
+      for (let colIdx = 0; colIdx < cols.length; colIdx++) {
+        const colName = cols[colIdx];
+        const dateCount = rozsAhead.filter(row => {
+          const val = row[colName];
+          const parsed = parseRowDate(val);
+          return parsed && !isNaN(parsed.getTime());
+        }).length;
         
-        // If this row's first column is a date, it's a date header
-        if (parsedDate && !isNaN(parsedDate.getTime())) {
-          currentDate = parsedDate;
-          
-          // Add date header row
+        // If this column has dates in most rows of our sample, it's the date column
+        if (dateCount > rozsAhead.length * 0.3) {
+          dateColIndex = colIdx;
+          break;
+        }
+      }
+      
+      let lastDate = null;
+      
+      rows.slice(0, shown).forEach((row, rowIdx) => {
+        let currentDate = null;
+        let isDateRow = false;
+        
+        // Check if this entire row is a date (all values are null/empty except first column)
+        const rowValues = cols.map(c => row[c]);
+        const nonEmptyCount = rowValues.filter(v => v != null && v !== '' && typeof v !== 'number').length;
+        
+        // Check if first column has a date
+        const firstColVal = row[cols[0]];
+        const firstColDate = parseRowDate(firstColVal);
+        if (firstColDate && !isNaN(firstColDate.getTime())) {
+          currentDate = firstColDate;
+          isDateRow = true;
+        }
+        
+        // If date column was found, check that too
+        if (!isDateRow && dateColIndex >= 0) {
+          const dateColVal = row[cols[dateColIndex]];
+          const dateColDate = parseRowDate(dateColVal);
+          if (dateColDate && !isNaN(dateColDate.getTime())) {
+            currentDate = dateColDate;
+          }
+        }
+        
+        // If we found a new date, add a header
+        if (currentDate && lastDate === null) {
+          // First date - add header
+          const dateStr = currentDate.toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' });
           const dateHeaderRow = document.createElement('tr');
           dateHeaderRow.style.cssText = 'background:var(--green-light);border-top:2px solid #2d6a4f;border-bottom:1px solid #2d6a4f;font-weight:700;';
-          const dateStr = parsedDate.toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' });
           dateHeaderRow.innerHTML = `<td colspan="${cols.length}" style="padding:10px 12px;color:#2d6a4f;font-size:13px;font-weight:700;">📅 ${dateStr}</td>`;
           tbody.appendChild(dateHeaderRow);
-        } else {
-          // Regular data row
+          lastDate = currentDate;
+        } else if (currentDate && lastDate && currentDate.toDateString() !== lastDate.toDateString()) {
+          // Date changed - add new header
+          const dateStr = currentDate.toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          const dateHeaderRow = document.createElement('tr');
+          dateHeaderRow.style.cssText = 'background:var(--green-light);border-top:2px solid #2d6a4f;border-bottom:1px solid #2d6a4f;font-weight:700;';
+          dateHeaderRow.innerHTML = `<td colspan="${cols.length}" style="padding:10px 12px;color:#2d6a4f;font-size:13px;font-weight:700;">📅 ${dateStr}</td>`;
+          tbody.appendChild(dateHeaderRow);
+          lastDate = currentDate;
+        }
+        
+        // Add the data row (skip if it was just a date row header in the original data)
+        if (!isDateRow || nonEmptyCount > 1) {
           const tr = document.createElement('tr');
           tr.innerHTML = cols.map(c => {
             const v   = row[c];
