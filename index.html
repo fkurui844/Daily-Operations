@@ -2849,9 +2849,6 @@ function renderSheet(name, sheet, container) {
     const wrap  = document.createElement('div'); wrap.className = 'table-wrap';
     const table = document.createElement('table');
     
-    // For Production sheets, find the date column
-    const isProdSheet = name.toLowerCase().includes('prod');
-    
     // TH = exact column header; append detected unit in parentheses
     table.innerHTML = `<thead><tr>${cols.map(c => {
       const u = detectUnit(name, c);
@@ -2860,137 +2857,54 @@ function renderSheet(name, sheet, container) {
     
     const tbody = document.createElement('tbody');
     
-    if (isProdSheet) {
-      // For Production, find which column contains dates
-      let dateColIndex = -1;
-      const rozsAhead = rows.slice(0, Math.min(20, rows.length));
+    // For Production sheets, add date headers before each date's data
+    const isProdSheet = name.toLowerCase().includes('prod');
+    
+    rows.slice(0, shown).forEach((row, rowIdx) => {
+      const firstCol = cols[0];
+      const firstColValue = row[firstCol];
+      const parsedDate = parseRowDate(firstColValue);
       
-      // Check each column to find dates
-      for (let colIdx = 0; colIdx < cols.length; colIdx++) {
-        const colName = cols[colIdx];
-        const dateCount = rozsAhead.filter(row => {
-          const val = row[colName];
-          const parsed = parseRowDate(val);
-          return parsed && !isNaN(parsed.getTime());
-        }).length;
-        
-        // If this column has dates in most rows of our sample, it's the date column
-        if (dateCount > rozsAhead.length * 0.3) {
-          dateColIndex = colIdx;
-          break;
-        }
+      // If first column contains a date, add a green date header row first
+      if (isProdSheet && parsedDate && !isNaN(parsedDate.getTime())) {
+        const dateStr = parsedDate.toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const dateHeaderRow = document.createElement('tr');
+        dateHeaderRow.style.cssText = 'background:var(--green-light);border-top:2px solid #2d6a4f;border-bottom:1px solid #2d6a4f;font-weight:700;';
+        dateHeaderRow.innerHTML = `<td colspan="${cols.length}" style="padding:10px 12px;color:#2d6a4f;font-size:13px;font-weight:700;">📅 ${dateStr}</td>`;
+        tbody.appendChild(dateHeaderRow);
       }
       
-      let lastDate = null;
-      
-      rows.slice(0, shown).forEach((row, rowIdx) => {
-        let currentDate = null;
-        let isDateRow = false;
-        
-        // Check if this entire row is a date (all values are null/empty except first column)
-        const rowValues = cols.map(c => row[c]);
-        const nonEmptyCount = rowValues.filter(v => v != null && v !== '' && typeof v !== 'number').length;
-        
-        // Check if first column has a date
-        const firstColVal = row[cols[0]];
-        const firstColDate = parseRowDate(firstColVal);
-        if (firstColDate && !isNaN(firstColDate.getTime())) {
-          currentDate = firstColDate;
-          isDateRow = true;
-        }
-        
-        // If date column was found, check that too
-        if (!isDateRow && dateColIndex >= 0) {
-          const dateColVal = row[cols[dateColIndex]];
-          const dateColDate = parseRowDate(dateColVal);
-          if (dateColDate && !isNaN(dateColDate.getTime())) {
-            currentDate = dateColDate;
-          }
-        }
-        
-        // If we found a new date, add a header
-        if (currentDate && lastDate === null) {
-          // First date - add header
-          const dateStr = currentDate.toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-          const dateHeaderRow = document.createElement('tr');
-          dateHeaderRow.style.cssText = 'background:var(--green-light);border-top:2px solid #2d6a4f;border-bottom:1px solid #2d6a4f;font-weight:700;';
-          dateHeaderRow.innerHTML = `<td colspan="${cols.length}" style="padding:10px 12px;color:#2d6a4f;font-size:13px;font-weight:700;">📅 ${dateStr}</td>`;
-          tbody.appendChild(dateHeaderRow);
-          lastDate = currentDate;
-        } else if (currentDate && lastDate && currentDate.toDateString() !== lastDate.toDateString()) {
-          // Date changed - add new header
-          const dateStr = currentDate.toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-          const dateHeaderRow = document.createElement('tr');
-          dateHeaderRow.style.cssText = 'background:var(--green-light);border-top:2px solid #2d6a4f;border-bottom:1px solid #2d6a4f;font-weight:700;';
-          dateHeaderRow.innerHTML = `<td colspan="${cols.length}" style="padding:10px 12px;color:#2d6a4f;font-size:13px;font-weight:700;">📅 ${dateStr}</td>`;
-          tbody.appendChild(dateHeaderRow);
-          lastDate = currentDate;
-        }
-        
-        // Add the data row (skip if it was just a date row header in the original data)
-        if (!isDateRow || nonEmptyCount > 1) {
-          const tr = document.createElement('tr');
-          tr.innerHTML = cols.map(c => {
-            const v   = row[c];
-            const isN = typeof v === 'number';
-            const u   = isN ? detectUnit(name, c) : '';
-            let display;
-            if (v == null) {
-              display = '—';
-            } else if (isN) {
-              display = fmtU(v, u, v % 1 !== 0 ? 2 : 0);
-            } else {
-              const parsed = parseRowDate(v);
-              if (parsed && !isNaN(parsed.getTime())) {
-                const dd = String(parsed.getDate()).padStart(2, '0');
-                const mm = String(parsed.getMonth() + 1).padStart(2, '0');
-                const yyyy = parsed.getFullYear();
-                display = `${dd}/${mm}/${yyyy}`;
-              } else {
-                display = String(v);
-              }
-            }
-            return `<td class="${isN ? 'td-num' : ''}">${display}</td>`;
-          }).join('');
-          tbody.appendChild(tr);
-        }
-      });
-      
-      table.appendChild(tbody);
-    } else {
-      // Original table logic for non-Production sheets
-      const tbody2 = document.createElement('tbody');
-      rows.slice(0, shown).forEach(row => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = cols.map(c => {
-          const v   = row[c];
-          const isN = typeof v === 'number';
-          const u   = isN ? detectUnit(name, c) : '';
-          let display;
-          if (v == null) {
-            display = '—';
-          } else if (isN) {
-            display = fmtU(v, u, v % 1 !== 0 ? 2 : 0);
+      // Add the data row
+      const tr = document.createElement('tr');
+      tr.innerHTML = cols.map(c => {
+        const v   = row[c];
+        const isN = typeof v === 'number';
+        const u   = isN ? detectUnit(name, c) : '';
+        let display;
+        if (v == null) {
+          display = '—';
+        } else if (isN) {
+          display = fmtU(v, u, v % 1 !== 0 ? 2 : 0);
+        } else {
+          const parsed = parseRowDate(v);
+          if (parsed && !isNaN(parsed.getTime())) {
+            const dd = String(parsed.getDate()).padStart(2, '0');
+            const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+            const yyyy = parsed.getFullYear();
+            display = `${dd}/${mm}/${yyyy}`;
           } else {
-            const parsed = parseRowDate(v);
-            if (parsed && !isNaN(parsed.getTime())) {
-              const dd = String(parsed.getDate()).padStart(2, '0');
-              const mm = String(parsed.getMonth() + 1).padStart(2, '0');
-              const yyyy = parsed.getFullYear();
-              display = `${dd}/${mm}/${yyyy}`;
-            } else {
-              display = String(v);
-            }
+            display = String(v);
           }
-          return `<td class="${isN ? 'td-num' : ''}">${display}</td>`;
-        }).join('');
-        tbody2.appendChild(tr);
-      });
-      table.appendChild(tbody2);
-    }
+        }
+        return `<td class="${isN ? 'td-num' : ''}">${display}</td>`;
+      }).join('');
+      tbody.appendChild(tr);
+    });
     
+    table.appendChild(tbody);
     wrap.appendChild(table);
     tableCard.appendChild(wrap);
+    
     // Show more / show all buttons
     if (shown < rows.length) {
       const btnWrap = document.createElement('div');
