@@ -1986,7 +1986,7 @@ function renderOverview(container) {
   compSection.textContent = '📊 Metric Comparisons';
   container.appendChild(compSection);
 
-  // Helper function to get specific metric data - improved column detection
+  // Helper function to get specific metric data - improved column detection with outlier removal
   function getComparisonData(sheetName, metricKeywords, excludeKeywords) {
     const sheet = allData[sheetName];
     if (!sheet) return null;
@@ -2018,6 +2018,18 @@ function renderOverview(container) {
     
     const daily = getDailyAgg(rows, dateCol, [col], daysWindow);
     if (daily.length < 2) return null;
+    
+    // Remove outliers: if first value is > 3x median, skip it
+    if (daily.length > 2) {
+      const values = daily.map(d => d.totals[col] || 0).filter(v => v > 0);
+      if (values.length > 1) {
+        const sorted = [...values].sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+        if (daily[0].totals[col] > median * 3) {
+          daily.shift(); // Remove first outlier
+        }
+      }
+    }
     
     return { col, daily, unit: detectUnit(sheetName, col) };
   }
@@ -2065,13 +2077,46 @@ function renderOverview(container) {
     }));
     const sortedDates = [...allDates.entries()].sort((a, b) => a[1] - b[1]).map(e => e[0]);
 
-    // Build datasets for line charts
+    // Build datasets for line charts with smart filtering
     const datasets = seriesData.map(s => {
       const byLabel = {};
       s.data.daily.forEach(d => { byLabel[d.label] = d.totals[s.data.col] || 0; });
+      const rawData = sortedDates.map(lbl => byLabel[lbl] || 0);
+      
+      // Filter out extreme outliers: keep values within reasonable range
+      const nonZeroValues = rawData.filter(v => v > 0);
+      if (nonZeroValues.length > 2) {
+        const sorted = [...nonZeroValues].sort((a, b) => a - b);
+        const q1 = sorted[Math.floor(sorted.length * 0.25)];
+        const q3 = sorted[Math.floor(sorted.length * 0.75)];
+        const iqr = q3 - q1;
+        const upperBound = q3 + (iqr * 3); // Remove values > 3x IQR above Q3
+        
+        // Filter extreme outliers
+        const filteredData = rawData.map(v => {
+          if (v > upperBound) return 0; // Treat extreme outliers as 0
+          return v;
+        });
+        
+        return {
+          label: s.name,
+          data: filteredData,
+          borderColor: s.color.main,
+          backgroundColor: s.color.main + '15',
+          borderWidth: 2.5,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          pointBackgroundColor: s.color.main,
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2
+        };
+      }
+      
       return {
         label: s.name,
-        data: sortedDates.map(lbl => byLabel[lbl] || 0),
+        data: rawData,
         borderColor: s.color.main,
         backgroundColor: s.color.main + '15',
         borderWidth: 2.5,
@@ -2115,7 +2160,16 @@ function renderOverview(container) {
         },
         scales: {
           x: { stacked: false },
-          y: { stacked: false, grid: { color: '#f0ede8' }, ticks: { font: { size: 9, family: 'DM Mono' }, callback: v => fmt(v) } }
+          y: { 
+            stacked: false, 
+            grid: { color: '#f0ede8' }, 
+            beginAtZero: true,
+            ticks: { 
+              font: { size: 9, family: 'DM Mono' }, 
+              callback: v => fmt(v),
+              maxTicksLimit: 8
+            }
+          }
         }
       }
     });
