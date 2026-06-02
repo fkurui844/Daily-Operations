@@ -2177,11 +2177,19 @@ function renderOverview(container) {
   });
 
   // ═════════════════════════════════════════════════════════════════════════════
-  const sec4 = document.createElement('div'); sec4.className = 'ov-sec'; sec4.textContent = 'All-Time Totals — Click to Drill Down';
+  // SECTION 4 — QUICK-ACCESS DRILL-DOWN BAR (moved to bottom)
+  // ═════════════════════════════════════════════════════════════════════════════
+  const sec4 = document.createElement('div'); 
+  sec4.className = 'ov-sec'; 
+  sec4.textContent = 'All-Time Totals — Click to Drill Down';
+  sec4.style.marginTop = '2rem';
+  sec4.style.clear = 'both';
   container.appendChild(sec4);
 
   const ddBar = document.createElement('div');
   ddBar.className = 'dd-bar';
+  ddBar.style.marginTop = '0.5rem';
+  ddBar.style.clear = 'both';
   sheetMeta.forEach(({ name, color }) => {
     const sheet = allData[name];
     const nums  = getNumCols(sheet.cols, sheet.rows);
