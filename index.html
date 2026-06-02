@@ -1298,7 +1298,7 @@ function renderOverview(container) {
     s.id = 'ov-styles';
     s.textContent = `
       /* ─── layout ─────────────────────────────── */
-      .ov-sec { margin: 1.4rem 0 0.7rem; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:var(--text-faint); display:flex; align-items:center; gap:8px; }
+      .ov-sec { margin: 3rem 0 0.7rem; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:var(--text-faint); display:flex; align-items:center; gap:8px; clear:both; }
       .ov-sec::after { content:''; flex:1; height:1px; background:var(--border); }
 
       /* ─── trend badges ───────────────────────── */
@@ -1349,7 +1349,7 @@ function renderOverview(container) {
       .alert-sub  { font-size:11px; color:var(--text-muted); }
 
       /* ─── drill-down bar ─────────────────────── */
-      .dd-bar { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; background:var(--surface); margin-bottom:.5rem; }
+      .dd-bar { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; background:var(--surface); margin-top:3rem; margin-bottom:.5rem; clear:both; }
       .dd-cell{ padding:.85rem 1.1rem; border-right:1px solid var(--border); cursor:pointer; transition:background .12s; }
       .dd-cell:last-child { border-right:none; }
       .dd-cell:hover { background:var(--bg); }
@@ -1358,7 +1358,7 @@ function renderOverview(container) {
       .dd-sub { font-size:10px; color:var(--text-muted); margin-top:2px; }
 
       /* ─── combined overview chart ────────────── */
-      .ov-chart-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:1.1rem 1.25rem; margin-bottom:.5rem; }
+      .ov-chart-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:1.1rem 1.25rem; margin-bottom:2rem; clear:both; }
       .ov-chart-head { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:.9rem; }
       .ov-chart-title { font-size:14px; font-weight:600; }
       .ov-chart-sub   { font-size:11px; color:var(--text-muted); margin-top:2px; }
