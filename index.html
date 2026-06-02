@@ -2594,9 +2594,10 @@ function renderSheet(name, sheet, container) {
     const isFinanceSheet = name.toLowerCase().includes('financ') || name.toLowerCase().includes('cash') || name.toLowerCase().includes('credit') || name.toLowerCase().includes('payment');
 
     const isMilkSheet = name.toLowerCase().includes('milk') || name.toLowerCase().includes('intake');
+    const isProdSheet = name.toLowerCase().includes('prod');
 
-    // Bar chart — skip for Sales, Finance and Milk Intake sheets (replaced by better charts)
-    if (!isSalesSheet && !isFinanceSheet && !isMilkSheet) {
+    // Bar chart — skip for Sales, Finance, Milk Intake and Production sheets (replaced by better charts)
+    if (!isSalesSheet && !isFinanceSheet && !isMilkSheet && !isProdSheet) {
       const primaryCol  = nums[0];
       const primaryUnit = detectUnit(name, primaryCol);
       const barCard = document.createElement('div');
@@ -2656,15 +2657,15 @@ function renderSheet(name, sheet, container) {
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
               <button id="${lineId}_btn_vol" onclick="salesChartSwitch('${lineId}','vol')"
                 style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid ${color.main};background:${color.main};color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s">
-                📦 Volume (L)
+                Sales Volume (L)
               </button>
               <button id="${lineId}_btn_kes" onclick="salesChartSwitch('${lineId}','kes')"
                 style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s">
-                💰 Revenue (KES)
+                Sales In Revenue-ksh
               </button>
               <button id="${lineId}_btn_both" onclick="salesChartSwitch('${lineId}','both')"
                 style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s">
-                ⚡ Both
+                Both
               </button>
             </div>
           </div>`;
@@ -2823,19 +2824,19 @@ function renderSheet(name, sheet, container) {
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
               <button id="${lineId}_btn_cash" onclick="finChartSwitch('${lineId}','cash')"
                 style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid ${color.main};background:${color.main};color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s">
-                💵 Cash
+                Cash Collection
               </button>
               <button id="${lineId}_btn_credit" onclick="finChartSwitch('${lineId}','credit')"
                 style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s">
-                🧾 Credit
+                Credit Collection
               </button>
               ${totalCol2 ? `<button id="${lineId}_btn_total" onclick="finChartSwitch('${lineId}','total')"
                 style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s">
-                📊 Totals
+                Totals
               </button>` : ''}
               <button id="${lineId}_btn_both" onclick="finChartSwitch('${lineId}','both')"
                 style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s">
-                ⚡ All
+                All
               </button>
             </div>
           </div>`;
@@ -2889,13 +2890,31 @@ function renderSheet(name, sheet, container) {
         });
         const legendEl = document.createElement('div');
         legendEl.className = 'legend';
+        const lineId = name.replace(/\W/g,'') + '_line';
         nums.forEach((col, i) => {
           const u = detectUnit(name, col);
-          legendEl.innerHTML += `<div class="legend-item"><div class="legend-swatch" style="background:${palette[i]}"></div>${col}${u ? ' (' + u + ')' : ''}</div>`;
+          const itemEl = document.createElement('div');
+          itemEl.className = 'legend-item';
+          itemEl.id = `${lineId}_legend_${i}`;
+          itemEl.style.cursor = 'pointer';
+          itemEl.style.opacity = '1';
+          itemEl.style.transition = 'opacity 0.2s';
+          itemEl.innerHTML = `<div class="legend-swatch" style="background:${palette[i]}"></div>${col}${u ? ' (' + u + ')' : ''}`;
+          itemEl.onclick = function() {
+            const chart = chartInst[lineId];
+            if (!chart) return;
+            const ds = chart.data.datasets[i];
+            if (ds) {
+              ds.hidden = !ds.hidden;
+              chart.update();
+              itemEl.style.opacity = ds.hidden ? '0.4' : '1';
+              itemEl.style.textDecoration = ds.hidden ? 'line-through' : 'none';
+            }
+          };
+          legendEl.appendChild(itemEl);
         });
-        lineCard.innerHTML = `<div class="card-header"><div><div class="card-title">All metrics — trend</div><div class="card-sub">${nums.length} columns</div></div></div>`;
+        lineCard.innerHTML = `<div class="card-header"><div><div class="card-title">All metrics — trend</div><div class="card-sub">${nums.length} columns · Click legend to toggle</div></div></div>`;
         lineCard.appendChild(legendEl);
-        const lineId = name.replace(/\W/g,'') + '_line';
         const { wrap: lw, canvas: lc } = makeCanvas(lineId, 260);
         lineCard.appendChild(lw);
         chartsRow.appendChild(lineCard);
